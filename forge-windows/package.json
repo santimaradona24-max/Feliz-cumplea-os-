@@ -1,0 +1,46 @@
+{
+  "name": "forge-desktop",
+  "productName": "Forge",
+  "version": "0.4.0",
+  "description": "Forge — estudio de IA y entorno de desarrollo",
+  "main": "main.js",
+  "author": "Forge",
+  "license": "MIT",
+  "scripts": {
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^38.2.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.forge.studio",
+    "productName": "Forge",
+    "asar": false,
+    "files": [
+      "main.js",
+      "forge-server.js",
+      "forge.html",
+      "forge-icon.ico",
+      "forge-logo.svg"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "forge-icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Forge"
+    },
+    "portable": {
+      "artifactName": "Forge-${version}-portable.exe"
+    },
+    "artifactName": "Forge-${version}-setup.exe"
+  }
+}

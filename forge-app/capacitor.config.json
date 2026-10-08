@@ -1,0 +1,14 @@
+{
+  "appId": "app.forge.studio",
+  "appName": "Forge",
+  "webDir": "www",
+  "backgroundColor": "#f6f7f9",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

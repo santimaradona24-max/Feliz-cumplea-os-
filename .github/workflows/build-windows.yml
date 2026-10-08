@@ -22,6 +22,9 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: forge-windows/package.json
+      - name: Generate Windows icon
+        shell: pwsh
+        run: magick forge-logo.svg -define icon:auto-resize=256,128,64,48,32,16 forge-icon.ico
       - name: Install dependencies
         run: npm install
       - name: Build Windows packages
@@ -30,5 +33,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: forge-windows
-          path: |
-            forge-windows/dist/*.exe
+          path: forge-windows/dist/*.exe

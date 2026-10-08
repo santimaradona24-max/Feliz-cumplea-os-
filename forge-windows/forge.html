@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>Forge — estudio de IA</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#e4491c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--side:#eef0f4;--line:#dde1e8;--text:#151922;--muted:#667085;--accent:#e4491c;--accent-h:#c93d14;--on-accent:#fff;--bad:#d92d20;--ok:#1f9d6b;--user:#151922;--on-user:#fff;--code:#12161d;--on-code:#e6e9ef;--sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--panel:#151a22;--side:#11151b;--line:#252c38;--text:#e7eaf0;--muted:#8b93a3;--accent:#ff6a3d;--accent-h:#ff8460;--on-accent:#1a0d07;--user:#242b38}}
+:root[data-theme="dark"]{--bg:#0e1116;--panel:#151a22;--side:#11151b;--line:#252c38;--text:#e7eaf0;--muted:#8b93a3;--accent:#ff6a3d;--accent-h:#ff8460;--on-accent:#1a0d07;--user:#242b38}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;font:15px var(--sans);background:var(--bg);color:var(--text);overflow:hidden}
+button{font-family:inherit;color:inherit}
+::selection{background:var(--accent);color:var(--on-accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.hidden{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.app{display:grid;grid-template-columns:264px 1fr;height:100vh;height:100dvh;width:100%}
+.app.panel-open{grid-template-columns:264px 1fr minmax(360px,44%)}
+.sidebar{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px 10px;font-weight:600;font-size:17px;letter-spacing:-.01em}
+.logo{width:32px;height:32px;display:grid;place-items:center;flex-shrink:0;color:var(--accent)}
+.logo svg{width:32px;height:32px;display:block}
+.new-chat{margin:8px 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-weight:500;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.new-chat:hover,.gear-btn:hover,.btn-ghost:hover,.example-btn:hover,.ap-close:hover,.ap-foot button:hover,.ac-open:hover,.project-bar button:hover{border-color:var(--accent)}
+.chat-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 8px}
+.chat-item{display:flex;align-items:center;gap:4px;padding:6px 6px 6px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted)}
+.chat-item:hover{background:var(--line)}
+.chat-item.active{background:var(--panel);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
+.chat-item .title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-item .del{background:none;border:0;color:var(--muted);cursor:pointer;width:32px;height:32px;border-radius:6px;opacity:0;flex-shrink:0}
+.chat-item:hover .del,.chat-item .del:focus-visible{opacity:1}
+.chat-item .del:hover{color:var(--bad)}
+@media (hover:none){.chat-item .del{opacity:.7}}
+.sidebar-foot{display:flex;align-items:center;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+#providerLabel{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+.gear-btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.topbar h1{flex:1;min-width:0;margin:0;font-size:15px;font-weight:600}
+.topbar input{width:100%;font:inherit;font-weight:600;border:0;background:transparent;color:inherit;padding:6px 8px;border-radius:6px;text-overflow:ellipsis}
+.topbar input:hover,.topbar input:focus{background:var(--bg);outline:none}
+.top-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-ghost{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border:0;background:none;border-radius:10px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.icon-btn:hover{background:var(--side);color:var(--text)}
+.btn-ghost.on,.icon-btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.plan-bar{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px}
+.plan-bar.hidden{display:none}
+.plan-head{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em}
+.plan-steps{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto}
+.plan-step{display:flex;align-items:center;gap:8px;font-size:13px}
+.plan-step .plan-dot{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--muted);flex-shrink:0}
+.plan-step.doing .plan-dot{border-color:var(--accent);background:var(--accent);animation:pulse 1s infinite ease-in-out}
+.plan-step.done .plan-dot{border-color:var(--ok);background:var(--ok)}
+.plan-step.done .plan-text{color:var(--muted);text-decoration:line-through}
+.tool-log{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.tool-chip{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;border:1px solid var(--line);background:var(--side);border-radius:8px;padding:5px 10px;font:12px var(--mono);color:var(--muted);max-width:100%}
+.tool-chip .tc-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool-chip.done{border-color:var(--ok);color:var(--text)}
+.tool-chip.done::before{content:'✓';color:var(--ok);font-weight:700}
+.tool-chip.error{border-color:var(--bad);color:var(--text)}
+.tool-chip.error::before{content:'!';color:var(--bad);font-weight:700}
+.context-box{background:var(--panel);border-bottom:1px solid var(--line);max-height:0;overflow:hidden;transition:max-height .18s ease}
+.context-box.open{max-height:260px}
+.context-inner{padding:12px 16px}
+.context-inner label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.context-inner textarea{width:100%;min-height:90px;max-height:140px;resize:none;border:1px solid var(--line);border-radius:8px;font:12.5px/1.5 var(--mono);padding:8px 10px;background:var(--bg);color:var(--text)}
+.context-inner p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.messages{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px 20px 12px}
+.messages>*{max-width:760px;margin-left:auto;margin-right:auto}
+.messages>.empty-state{margin-top:6vh}
+.empty-state h2{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:0 0 8px}
+.empty-state p{color:var(--muted);line-height:1.6;margin:0 0 20px}
+.setup-card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:16px;margin-bottom:16px}
+.setup-card h3{margin:0 0 4px;font-size:15px}
+.setup-card p{margin:0 0 12px;font-size:13.5px}
+.examples{display:flex;flex-direction:column;gap:8px}
+.example-btn{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 14px;font-size:14px;cursor:pointer}
+.messages>.msg{display:flex;gap:12px;margin-bottom:24px;align-items:flex-start}
+.avatar{width:28px;height:28px;border-radius:8px;background:var(--side);border:1px solid var(--line);display:grid;place-items:center;font:600 11px var(--mono);flex-shrink:0}
+.msg.user{flex-direction:row-reverse}
+.msg.user .avatar{display:none}
+.msg-body{min-width:0;max-width:100%}
+.msg.assistant .msg-body{flex:1}
+.msg.user .msg-body{max-width:82%}
+.bubble{line-height:1.65;overflow-wrap:anywhere}
+.msg.user .bubble{background:var(--user);color:var(--on-user);padding:10px 14px;border-radius:14px 14px 4px 14px;white-space:pre-wrap}
+.bubble p{margin:0 0 .75em}.bubble p:last-child{margin-bottom:0}
+.bubble ul,.bubble ol{margin:.3em 0 .75em;padding-left:1.4em}.bubble li{margin-bottom:.25em}
+.bubble h1,.bubble h2,.bubble h3{line-height:1.3;margin:.9em 0 .4em;font-weight:600}
+.bubble h1{font-size:1.25em}.bubble h2{font-size:1.12em}.bubble h3{font-size:1.02em}
+.bubble a{color:var(--accent)}
+.bubble code{font-family:var(--mono);background:var(--side);padding:1px 5px;border-radius:4px;font-size:.88em}
+.meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}
+.msg.user .meta{justify-content:flex-end}
+.msg-actions{display:flex;gap:4px}
+.msg-actions button{background:none;border:0;padding:5px 8px;border-radius:6px;font-size:12px;color:var(--muted);cursor:pointer}
+.msg-actions button:hover{background:var(--side);color:var(--text)}
+.attach-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.msg.user .attach-row{justify-content:flex-end}
+.attach-thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in}
+.attach-file-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 9px;font:12px var(--mono);max-width:200px}
+.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.source-list{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.src-label{color:var(--muted)}
+.source-chip{display:flex;gap:6px;align-items:baseline}
+.source-chip .n{color:var(--muted);font:11px var(--mono)}
+.source-chip a{color:var(--text)}
+.search-status{display:flex;align-items:center;gap:8px;padding-bottom:8px;font-size:13px;color:var(--muted)}
+.spark{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite ease-in-out;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+.tag{background:var(--side);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:11px;font-weight:600;margin-right:8px}
+.project-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px 10px 0 0;background:var(--side);font-size:13px}
+.ac-open,.project-bar button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:500;cursor:pointer;flex-shrink:0}
+.artifact-card{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.project-bar+.artifact-card{border-radius:0 0 10px 10px;margin-top:0;border-top:0}
+.ac-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;font:13px var(--mono);border-bottom:1px solid var(--line)}
+.artifact-card pre{margin:0;background:var(--code);color:var(--on-code);padding:12px;overflow-x:auto;font:12.5px/1.55 var(--mono);max-height:150px}
+.artifact-forming{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 12px;border:1px dashed var(--line);border-radius:10px;font:13px var(--mono);color:var(--muted)}
+.artifact-forming.done .spark{animation:none;background:var(--ok)}
+.plain-block{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}
+.pb-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px 6px 12px;border-bottom:1px solid var(--line);font:13px var(--mono)}
+.pb-copy{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:500;cursor:pointer;flex-shrink:0}
+.plain-block pre{margin:0;background:var(--code);color:var(--on-code);padding:12px;font:12.5px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
+.typing{display:inline-flex;gap:4px;padding:6px 0}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.1s infinite ease-in-out}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.toast-wrap{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:120;pointer-events:none;width:max-content;max-width:min(92vw,520px)}
+.toast{padding:10px 14px;border-radius:10px;background:var(--text);color:var(--bg);font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:pop .15s ease}
+.toast.err{background:var(--bad);color:#fff}
+@keyframes pop{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
+.pending-attachments{display:flex;gap:8px;max-width:800px;width:100%;margin:0 auto;padding:8px 20px 0;overflow-x:auto}
+.pending-chip{display:flex;align-items:center;gap:6px;flex-shrink:0;max-width:190px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:4px 4px 4px 8px;font:12px var(--mono)}
+.pending-chip img{width:26px;height:26px;object-fit:cover;border-radius:5px}
+.ico{background:var(--side);border-radius:5px;padding:3px 5px;font-size:10px;font-weight:600}
+.pending-chip .rm{background:none;border:0;width:32px;height:32px;color:var(--muted);cursor:pointer;border-radius:6px;flex-shrink:0}
+.pending-chip .rm:hover{color:var(--bad)}
+.composer{padding:8px 20px calc(12px + env(safe-area-inset-bottom))}
+.composer-inner,.composer-hint{max-width:760px;margin-left:auto;margin-right:auto}
+.composer-inner{display:flex;align-items:flex-end;gap:4px;border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:6px}
+.composer-inner:focus-within{border-color:var(--accent)}
+.composer-inner textarea{flex:1;min-width:0;border:0;resize:none;background:transparent;color:var(--text);font:15px/1.5 var(--sans);max-height:160px;padding:8px 6px;outline:none}
+.send-btn{width:40px;height:40px;border:0;border-radius:12px;background:var(--accent);color:var(--on-accent);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.send-btn:hover{background:var(--accent-h)}
+.send-btn.stopping{background:var(--text);color:var(--bg)}
+.composer-hint{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding:0 6px;font-size:12px;color:var(--muted)}
+@media (pointer:coarse){.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
+.artifact-panel{display:none;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);min-width:0;min-height:0}
+.app.panel-open .artifact-panel{display:flex}
+.ap-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px 16px;border-bottom:1px solid var(--line)}
+.ap-head .title{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-close{width:44px;height:44px;border:1px solid var(--line);background:var(--bg);border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.ap-tabs{display:flex;gap:6px;padding:8px 12px 0;overflow-x:auto}
+.ap-tab{padding:6px 10px;border-radius:8px;font:12px var(--mono);color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;border:1px solid transparent}
+.ap-tab.active{color:var(--text);background:var(--side);border-color:var(--line)}
+.ap-view-toggle{display:flex;gap:2px;margin:10px 12px;padding:3px;background:var(--side);border-radius:10px}
+.ap-view-toggle button{flex:1;border:0;background:none;border-radius:8px;padding:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted)}
+.ap-view-toggle button.active{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ap-body{flex:1;min-height:0;background:#fff}
+.ap-body iframe{width:100%;height:100%;border:0;background:#fff}
+.ap-body pre{margin:0;height:100%;overflow:auto;background:var(--code);color:var(--on-code);padding:16px;font:12.5px/1.6 var(--mono)}
+.ap-body textarea{width:100%;height:100%;margin:0;border:0;resize:none;background:var(--code);color:var(--on-code);padding:16px;font:12.5px/1.6 var(--mono)}
+.ap-body textarea:focus{outline:none}
+.ap-version-row{display:flex;gap:8px;align-items:center;padding:0 12px 10px}
+.ap-version-row select{flex:1;min-width:0;font:12.5px var(--sans);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit}
+.ap-version-row button{flex-shrink:0;padding:6px 10px;border:1px solid var(--accent);color:var(--accent);background:var(--panel);border-radius:8px;font-size:12px;font-weight:500;cursor:pointer}
+.ap-foot{display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.ap-foot button{flex:1;min-width:120px;padding:10px;border:1px solid var(--line);background:var(--panel);border-radius:8px;font-size:13px;font-weight:500;cursor:pointer}
+.ap-foot button.danger{color:var(--bad);border-color:var(--bad)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,12,16,.55);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal{position:relative;width:min(520px,100%);max-height:90vh;max-height:90dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+.modal-x{position:absolute;top:10px;right:10px;width:44px;height:44px;border:0;background:none;border-radius:10px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
+.modal-x:hover{background:var(--side)}
+.modal h2{margin:0 44px 4px 0;font-size:19px;font-weight:600}
+.modal .sub{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.provider-opt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:12.5px;color:var(--muted);line-height:1.45}
+.provider-opt b{display:block;color:var(--text);font-size:14px;margin-bottom:2px}
+.provider-opt.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+.field input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:13.5px var(--mono);background:var(--bg);color:var(--text)}
+.hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+.field select{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:13.5px var(--mono);background:var(--bg);color:var(--text)}
+.model-row{display:flex;gap:8px;margin-bottom:8px}
+.model-row select{flex:1;min-width:0}
+.mini-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:0 14px;font-size:17px;cursor:pointer;flex-shrink:0}
+.horde-box{border:1px solid var(--line);border-radius:10px;padding:12px 12px 2px;margin-bottom:14px;background:var(--side)}
+.horde-box .field{margin-bottom:12px}
+.horde-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+@media (max-width:860px){.field select{font-size:16px}}
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.modal-actions button{flex:1;padding:12px;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;border:1px solid var(--line);background:var(--panel)}
+.btn-primary,.modal-actions .btn-primary{background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);border-radius:10px;padding:10px 14px;font-weight:600;font-size:14px;cursor:pointer}
+.btn-primary:hover{background:var(--accent-h)}
+.btn-secondary{background:var(--panel);border:1px solid var(--line);color:inherit}
+.test-btn{width:100%;padding:10px;border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.test-btn:hover{border-color:var(--accent)}
+.test-btn:disabled{opacity:.6;cursor:default}
+.test-btn .spark{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite ease-in-out;flex-shrink:0}
+.danger-zone{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.danger-zone button{width:100%;padding:10px;border:1px solid var(--bad);color:var(--bad);background:transparent;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer}
+.danger-zone button:hover{background:var(--bad);color:#fff}
+#lightbox{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+#lightbox.open{display:flex}
+#lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.lb-x{position:absolute;top:calc(10px + env(safe-area-inset-top));right:10px;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:18px;cursor:pointer}
+.sidebar-backdrop{display:none}
+@media (max-width:860px){
+  .app,.app.panel-open{grid-template-columns:1fr}
+  .sidebar{position:fixed;inset:0 20% 0 0;z-index:40;transform:translateX(-105%);transition:transform .18s ease;padding-top:env(safe-area-inset-top);box-shadow:8px 0 24px rgba(0,0,0,.3)}
+  .sidebar.open{transform:none}
+  .sidebar-backdrop{position:fixed;inset:0;background:rgba(10,12,16,.5);z-index:39}
+  .sidebar.open~.sidebar-backdrop{display:block}
+  .artifact-panel{position:fixed;inset:0;z-index:60}
+  .topbar{padding:calc(8px + env(safe-area-inset-top)) 10px 8px}
+  .messages{padding:16px 14px 8px}
+  .composer{padding:8px 12px calc(10px + env(safe-area-inset-bottom))}
+  .pending-attachments{padding:8px 12px 0}
+  .btn-ghost .lbl-full{display:none}
+  .btn-ghost{padding:10px 12px}
+  .composer-inner textarea,.field input,.topbar input{font-size:16px}
+  .empty-state h2{font-size:24px}
+  .msg.user .msg-body{max-width:90%}
+  .modal{padding:18px 16px}
+  .provider-grid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- Archivos propios del proyecto (independientes de los generados por IA) ---- */
+.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:12.5px var(--mono);background:var(--bg);color:var(--text);resize:vertical;min-height:110px}
+.of-list{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.of-item{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px}
+.of-item:hover{border-color:var(--accent)}
+.of-item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--side)}
+.of-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.of-nm{font:12.5px var(--mono);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.of-meta{font-size:11px;color:var(--muted)}
+.of-del{background:none;border:0;color:var(--muted);cursor:pointer;width:32px;height:32px;border-radius:6px;flex-shrink:0}
+.of-del:hover{color:var(--bad);background:var(--side)}
+.of-empty{color:var(--muted);font-size:13px;margin:6px 0 12px}
+.of-preview{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.of-preview-head{font-size:12px;color:var(--muted);margin-bottom:6px}
+.of-preview pre{margin:0;max-height:220px;overflow:auto;background:var(--code);color:var(--on-code);padding:12px;border-radius:8px;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
+
+/* ---- Acciones de mensaje (usuario) y resumen (IA) ---- */
+.edit-area{width:100%;min-height:60px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:14px/1.5 var(--sans);resize:vertical;background:var(--panel);color:var(--text)}
+.edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.edit-actions button{padding:6px 12px;font-size:12.5px;border-radius:8px;cursor:pointer}
+.edit-actions .edit-cancel{border:1px solid var(--line);background:var(--panel);color:inherit}
+.edit-actions .edit-save{border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);font-weight:600}
+.msg-summary{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.msg-summary summary{cursor:pointer;font-weight:600;color:var(--muted);list-style:none;user-select:none}
+.msg-summary summary::-webkit-details-marker{display:none}
+.msg-summary summary:before{content:'▸ ';display:inline-block}
+.msg-summary[open] summary:before{content:'▾ '}
+.msg-summary .summary-body{margin-top:6px;padding:8px 10px;background:var(--side);border:1px solid var(--line);border-radius:8px;line-height:1.5;color:var(--text)}
+
+:root{--display:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif;--heat:linear-gradient(135deg,#ff8a3d,#e4491c 60%,#b8320f)}
+.brand,.empty-state h2,.modal h2,.ap-head .title,.setup-card h3,.example-btn b{font-family:var(--display)}
+.sidebar{--side:#12151b;--panel:#1b1f28;--line:#282e3a;--text:#e9ebf0;--muted:#8f97a7;--bg:#0d1015;color:var(--text);border-right:1px solid #0a0c10;background:radial-gradient(120% 55% at 0% 0%,rgba(255,106,61,.2),transparent 62%),var(--side)}
+.brand{font-size:21px;font-weight:700;letter-spacing:-.02em;color:#fff}
+.logo{background:var(--heat);color:#fff;box-shadow:0 0 20px rgba(255,106,61,.5)}
+.new-chat{background:var(--heat);border-color:transparent;color:#fff;font-weight:600}
+.new-chat:hover{border-color:transparent;filter:brightness(1.1)}
+.send-btn{background:var(--heat);color:#fff}
+.send-btn:hover{filter:brightness(1.1)}
+.send-btn.stopping{background:var(--text);color:var(--bg);filter:none}
+.tag{background:var(--heat);color:#fff;border-color:transparent}
+.topbar{position:relative}
+.topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,transparent,#ff8a3d,#e4491c,transparent);background-size:200% 100%;opacity:0;transition:opacity .25s;pointer-events:none}
+.main.busy .topbar::after{opacity:1;animation:heat 1.4s linear infinite}
+@keyframes heat{to{background-position:-200% 0}}
+.messages{isolation:isolate}
+.empty-state{position:relative}
+.empty-state::before{content:"";position:absolute;left:-40px;right:-40px;top:-70px;height:300px;background:radial-gradient(closest-side,rgba(255,106,61,.2),transparent);pointer-events:none;z-index:-1}
+.hero-mark{width:54px;height:54px;border-radius:16px;background:var(--heat);color:#fff;display:grid;place-items:center;margin-bottom:18px;box-shadow:0 12px 32px -8px rgba(228,73,28,.65)}
+.hero-mark svg{width:28px;height:28px}
+.empty-state h2{font-size:38px;font-weight:700;letter-spacing:-.035em;line-height:1.08}
+.example-btn{display:flex;align-items:center;gap:14px;color:var(--text);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+.example-btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px -12px rgba(228,73,28,.55)}
+.example-btn b{display:block;font-size:15.5px;margin-bottom:2px}
+.example-btn span:last-child{color:var(--muted);font-size:13px;line-height:1.4}
+.ex-ico{width:40px;height:40px;border-radius:11px;background:var(--side);color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+.msg.assistant .avatar{background:var(--heat);border:0;color:#fff;box-shadow:0 0 16px rgba(255,106,61,.35)}
+.avatar svg{width:15px;height:15px}
+.artifact-card{border-left:3px solid var(--accent)}
+@media (max-width:860px){.empty-state h2{font-size:30px}}
+/* ---- Menú + y secciones ---- */
+.plus-back{position:fixed;inset:0;z-index:70;background:rgba(10,12,16,.45)}
+.plus-sheet{position:fixed;z-index:71;left:12px;bottom:calc(84px + env(safe-area-inset-bottom));width:min(390px,calc(100% - 24px));max-height:72dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px 10px 10px;box-shadow:0 18px 50px -12px rgba(0,0,0,.5)}
+@media (max-width:860px){.plus-sheet{left:0;right:0;bottom:0;width:100%;max-height:80dvh;border-radius:18px 18px 0 0;padding:6px 12px calc(14px + env(safe-area-inset-bottom))}}
+.plus-sec{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:12px 4px 6px}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mode-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:13px;font-weight:500;cursor:pointer;text-align:left;min-width:0}
+.mode-opt.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.plus-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px 8px;border:0;background:none;border-radius:10px;cursor:pointer;text-align:left;font-size:14px;color:var(--text)}
+.plus-row:hover{background:var(--side)}
+.plus-row .pr-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.plus-row small{color:var(--muted);font-size:12px;font-weight:400}
+.plus-row .sw{width:34px;height:20px;border-radius:99px;background:var(--line);position:relative;flex-shrink:0}
+.plus-row .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.plus-row.on .sw{background:var(--accent)}
+.plus-row.on .sw::after{transform:translateX(14px)}
+.plus-row.on:not(:has(.sw)) .pr-t b::after{content:" · activo";color:var(--accent);font-weight:500}
+.plus-steps{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 8px 8px 38px;font-size:12.5px;color:var(--muted)}
+.plus-steps input{width:70px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg);color:var(--text);font:13px var(--mono)}
+.composer-chips{max-width:760px;margin:0 auto 6px;display:flex;flex-wrap:wrap;gap:6px}
+.chip-mini{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer}
+.chip-mini:first-child{color:var(--text)}
+.chip-mini{display:inline-flex;align-items:center;gap:6px}
+.mode-opt>.i,.plus-row>svg.i{box-sizing:content-box;width:18px;height:18px;padding:7px;border-radius:9px;background:var(--side);border:1px solid var(--line);color:var(--accent)}
+.mode-opt.active>.i{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.plus-row>.dot{margin:0 17px}
+.ex-ico .i{width:20px;height:20px}
+.empty-state h2{margin-bottom:22px}
+.duo-cfg{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
+.duo-cfg input,.duo-cfg select{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);color:var(--text);font:13px var(--mono)}
+.duo-cfg small{color:var(--muted);font-size:12px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="forgeBrandGradient" x1="18" y1="10" x2="105" y2="118" gradientUnits="userSpaceOnUse"><stop stop-color="#ff7a2f"/><stop offset=".48" stop-color="#e4491c"/><stop offset="1" stop-color="#b9320f"/></linearGradient></defs><path fill="url(#forgeBrandGradient)" d="M25 15h78L89 35H48v18h38L73 72H48v25l-23 16V15z"/><path fill="#ffad73" opacity=".78" d="M25 15h78l-9 11H45v16l-20 14V15z"/></svg></span>Forge</div>
+    <button class="new-chat" id="newChatBtn"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Nuevo chat</button>
+    <div class="chat-list" id="chatList"></div>
+    <div class="sidebar-foot">
+      <span class="dot" id="dotModel"></span><span id="providerLabel">Sin modelo configurado</span>
+      <button class="gear-btn" id="gearBtn">Ajustes</button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="sidebarToggle" aria-label="Conversaciones"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <h1><input id="chatTitle" value="Sin título" maxlength="60" aria-label="Título de la conversación" /></h1>
+    </div>
+
+    <div class="plan-bar hidden" id="planBar"></div>
+
+    <div class="context-box" id="ctxBox">
+      <div class="context-inner">
+        <label for="ctxText">Material de referencia</label>
+        <textarea id="ctxText" placeholder="Pegá documentación, un GDD o código existente que el modelo deba tomar como fuente."></textarea>
+        <p id="ctxHint">Para información actual (versiones, APIs, noticias) activá Internet desde el menú +.</p>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="pending-attachments hidden" id="pendingAttachments"></div>
+
+    <div class="composer">
+      <div class="composer-chips" id="composerChips"></div>
+      <div class="composer-inner">
+        <button class="icon-btn plus-btn" id="plusBtn" title="Opciones" aria-label="Opciones" aria-expanded="false"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <input type="file" id="fileInput" class="sr-only" multiple accept="image/*,video/*,.pdf,.txt,.md,.js,.jsx,.ts,.tsx,.mjs,.cjs,.py,.json,.css,.html,.htm,.csv,.gd,.cs,.lua,.cpp,.hpp,.cc,.c,.h,.java,.kt,.swift,.rs,.go,.rb,.php,.sh,.yml,.yaml,.xml,.toml,.ini,.log" />
+        <textarea id="input" rows="1" placeholder="Describí el juego, la mecánica o la duda..." aria-label="Mensaje"></textarea>
+        <button class="send-btn" id="sendBtn" title="Enviar" aria-label="Enviar"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      </div>
+      <div class="composer-hint"><span>Enter envía · Shift+Enter salto de línea</span><span id="saveStatus">Guardado</span></div>
+    </div>
+  </main>
+
+  <div class="plus-back hidden" id="plusBack"></div>
+  <div class="plus-sheet hidden" id="plusSheet" role="dialog" aria-label="Opciones">
+    <div class="plus-sec">Herramientas</div>
+    <button class="plus-row" id="attachBtn" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg><span class="pr-t"><b>Adjuntar</b><small>Imágenes, video, PDF o código</small></span></button>
+    <button class="plus-row" id="ctxToggle" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg><span class="pr-t"><b>Material de referencia</b><small>Pegar docs o código como fuente</small></span></button>
+    <button class="plus-row" id="webSearchToggle" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><span class="pr-t"><b>Internet</b><small>Buscar en tiempo real</small></span><i class="sw"></i></button>
+    <button class="plus-row" id="agentToggle" type="button"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M8 8V6a4 4 0 0 1 8 0v2M9 13v2M15 13v2"/></svg><span class="pr-t"><b>Agente</b><small>Archivos, sandbox y varios pasos</small></span><i class="sw"></i></button>
+    <div class="plus-steps hidden" id="plusStepsRow"><label for="plusSteps">Continuaciones automáticas</label><input id="plusSteps" type="number" min="0" max="20" inputmode="numeric"></div>
+    <div id="duoBox" class="hidden">
+      <button class="plus-row" id="duoToggle" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg><span class="pr-t"><b>Dúo</b><small>Director con filtros + escritor sin filtros</small></span><i class="sw"></i></button>
+      <div class="duo-cfg hidden" id="duoCfg">
+        <select id="duoPreset"><option value="gemini">Director: Gemini (clave gratis)</option><option value="deepseek">Director: DeepSeek</option><option value="openrouter">Director: OpenRouter</option><option value="otro">Director: otro compatible</option></select>
+        <input id="duoUrl" placeholder="URL base (formato OpenAI)" autocomplete="off"><input id="duoKey" type="password" placeholder="Clave de API del director" autocomplete="off"><input id="duoModel" placeholder="Modelo del director" autocomplete="off">
+        <button class="btn-ghost" id="duoTest" type="button">Probar director</button>
+        <small>El escritor es tu modelo principal de Ajustes (ej. la Horde). El director nunca recibe las escenas crudas.</small>
+      </div>
+    </div>
+    <div class="plus-sec">Proyecto</div>
+    <button class="plus-row" id="panelToggle" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/></svg><span class="pr-t"><b>Archivos generados</b><small>Lo que creó la IA</small></span></button>
+    <button class="plus-row" id="ownFilesBtn" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg><span class="pr-t"><b>Proyecto</b><small>Archivos propios</small></span></button>
+    <button class="plus-row hidden" id="installApp" type="button"><svg class="i" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M12 8v6M9.5 11.5L12 14l2.5-2.5"/></svg><span class="pr-t"><b>Instalar Forge</b><small>Como app, a pantalla completa</small></span></button>
+    <button class="plus-row" id="backupExport" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span class="pr-t"><b>Exportar respaldo</b><small>Todas tus conversaciones, sin claves</small></span></button>
+    <button class="plus-row" id="backupImport" type="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V5M7 9l5-4 5 4M5 20h14"/></svg><span class="pr-t"><b>Importar respaldo</b><small>Une un archivo .json con tus chats</small></span></button>
+    <input type="file" id="backupFile" class="sr-only" accept=".json,application/json">
+    <button class="plus-row" id="engineBtn" type="button" title="Forge Engine: comprobando..."><span class="dot" id="engineDot"></span><span class="pr-t"><b>Forge Engine</b><small>Servidor local</small></span></button>
+    <button class="plus-row" id="plusSettings" type="button"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="pr-t"><b>Ajustes</b><small>Modelo, clave y proveedor</small></span></button>
+    <div class="plus-sec">Sección</div>
+    <div class="mode-grid" id="modeGrid"></div>
+  </div>
+
+  <aside class="artifact-panel" id="artifactPanel" role="dialog" aria-label="Archivos generados">
+    <div class="ap-head">
+      <div class="title" id="apTitle">Archivos</div>
+      <button class="ap-close" id="apClose" aria-label="Cerrar"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="ap-tabs" id="apTabs"></div>
+    <div class="ap-view-toggle">
+      <button id="apViewPreview" class="active">Vista previa</button>
+      <button id="apViewCode">Código</button>
+    </div>
+    <div class="ap-version-row hidden" id="apVersionRow">
+      <select id="apVersionSelect"></select>
+      <button id="apRestoreVersion" class="hidden">Restaurar</button>
+    </div>
+    <div class="ap-body" id="apBody"></div>
+    <div class="ap-foot">
+      <button id="apCopy">Copiar código</button>
+      <button id="apEditToggle">Editar</button>
+      <button id="apSaveEdit" class="hidden">Guardar cambios</button>
+      <button id="apDownload">Descargar archivo</button>
+      <button id="apZip" class="hidden">Descargar proyecto (.zip)</button>
+      <button id="apDeleteFile" class="danger">Eliminar archivo</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="modal-backdrop hidden" id="settingsModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Configurar el modelo">
+    <button class="modal-x" id="cfgClose" aria-label="Cerrar"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2>Configurar el modelo</h2>
+    <div class="sub">Tu clave se guarda solo en este navegador y se envía únicamente al proveedor que elijas.</div>
+    <div class="provider-grid" id="providerGrid">
+      <div class="provider-opt" data-p="openrouter"><b>OpenRouter</b>Una clave, cientos de modelos</div>
+      <div class="provider-opt" data-p="openai"><b>OpenAI</b>API oficial (GPT)</div>
+      <div class="provider-opt" data-p="anthropic"><b>Anthropic</b>API oficial de Claude</div>
+      <div class="provider-opt" data-p="custom"><b>Personalizado</b>Groq, Ollama, LM Studio, DeepSeek…</div>
+      <div class="provider-opt" data-p="horde"><b>KoboldAI Horde</b>Gratis · voluntarios · enjambre de modelos</div>
+    </div>
+    <div class="field">
+      <label for="cfgBaseUrl">URL base de la API</label>
+      <input id="cfgBaseUrl" placeholder="https://openrouter.ai/api/v1" />
+      <div class="hint" id="baseUrlHint"></div>
+    </div>
+    <div class="field">
+      <label for="cfgApiKey">Clave de API</label>
+      <input id="cfgApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="cfgModelPick">Modelo</label>
+      <div class="model-row">
+        <select id="cfgModelPick"><option value="">Elegí un modelo…</option></select>
+        <button type="button" class="mini-btn" id="cfgModelReload" title="Actualizar la lista de modelos" aria-label="Actualizar la lista de modelos">↻</button>
+      </div>
+      <div class="hint" id="modelListNote"></div>
+      <input id="cfgModel" list="modelList" placeholder="…o escribí el nombre a mano" />
+      <datalist id="modelList"></datalist>
+      <div class="hint" id="modelHint"></div>
+    </div>
+    <div class="horde-box hidden" id="hordeBox">
+      <div class="field">
+        <label for="hFilter">Enjambre: filtro de modelos</label>
+        <input id="hFilter" placeholder="uncensored|abliterated|dolphin" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <div class="hint">La Horde no marca qué modelos son sin censura: este filtro (expresión regular, sin distinguir mayúsculas) busca esas palabras en el nombre del modelo. Todo en la Horde es gratis; con la clave anónima la cola es más lenta.</div>
+      </div>
+      <div class="horde-grid">
+        <div class="field"><label for="hMaxModels">Modelos en paralelo</label><input id="hMaxModels" type="number" min="1" max="10" inputmode="numeric" /></div>
+        <div class="field"><label for="hMinWorkers">Mín. workers por modelo</label><input id="hMinWorkers" type="number" min="1" max="50" inputmode="numeric" /></div>
+        <div class="field"><label for="hTimeout">Espera máx. (seg)</label><input id="hTimeout" type="number" min="10" max="600" inputmode="numeric" /></div>
+        <div class="field"><label for="hMaxLen">Tokens por respuesta</label><input id="hMaxLen" type="number" min="16" max="1024" inputmode="numeric" /></div>
+        <div class="field"><label for="hCtx">Contexto (tokens)</label><input id="hCtx" type="number" min="1024" max="32000" step="512" inputmode="numeric" /></div>
+        <div class="field"><label for="hStrategy">Cómo combinar</label><select id="hStrategy"><option value="fuse">Fusionar con un editor</option><option value="first">La primera que llegue</option></select></div>
+      </div>
+      <div class="hint" style="margin:-4px 0 12px">Cada modelo trabaja en su propia petición. Pasada la espera máxima se sigue con los que ya respondieron y se cancelan los demás. La Horde no admite herramientas: con este proveedor el modo agente se ignora.</div>
+    </div>
+    <div class="field">
+      <label for="cfgMaxOut">Tokens máximos de respuesta</label>
+      <input id="cfgMaxOut" type="number" min="256" step="256" inputmode="numeric" placeholder="Automático" />
+      <div class="hint" id="maxOutHint"></div>
+    </div>
+    <div class="field">
+      <label for="cfgMaxAutoSteps">Modo agente: pasos automáticos máximos por tarea</label>
+      <input id="cfgMaxAutoSteps" type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="4" />
+      <div class="hint">Con el modo Agente activado, cuántas veces puede continuar solo (sin que escribas de nuevo) mientras le queden pasos pendientes en su plan. 0 desactiva la continuación automática, pero las herramientas del agente igual funcionan en cada mensaje.</div>
+    </div>
+    <button type="button" class="test-btn" id="cfgTest">Probar conexión</button>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="cfgCancel">Cancelar</button>
+      <button class="btn-primary" id="cfgSave">Guardar y usar</button>
+    </div>
+    <div class="danger-zone"><button id="cfgWipe">Borrar clave y configuración de este navegador</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="ownFilesModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Archivos del proyecto">
+    <button class="modal-x" id="ofClose" aria-label="Cerrar"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2>Archivos del proyecto</h2>
+    <div class="sub">Archivos propios de este proyecto, separados de los que genera la IA. Se guardan solo en este navegador y siguen ahí al recargar la página.</div>
+    <button class="btn-primary" id="ofNewBtn" style="margin-bottom:14px">+ Nuevo archivo</button>
+    <div id="ofNewForm" class="hidden">
+      <div class="field">
+        <label for="ofName">Nombre y ruta</label>
+        <input id="ofName" placeholder="ej: src/jugador.gd o notas.txt" />
+        <div class="hint">La carpeta es lo que escribas antes de la última "/". La extensión es lo que sigue al último punto.</div>
+      </div>
+      <div class="field">
+        <label for="ofContent">Contenido (opcional)</label>
+        <textarea id="ofContent" placeholder="Podés dejarlo vacío y completarlo más adelante."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button id="ofCancelNew">Cancelar</button>
+        <button class="btn-primary" id="ofCreate">Crear archivo</button>
+      </div>
+    </div>
+    <div class="of-list" id="ofList"></div>
+    <div class="of-preview hidden" id="ofPreview"></div>
+  </div>
+</div>
+
+<template id="emptyTpl">
+  <div class="empty-state">
+    <div class="hero-mark"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5c.8 3.6 5 5.6 5 10.2a5 5 0 0 1-10 0c0-2 .9-3.3 2-4.2.1 2 1 3 2 3.2C11 8.8 10.5 6 12 2.5z"/></svg></div>
+    <h2>¿Qué vamos a forjar hoy?</h2>
+    <p>Mecánicas, código jugable y explicaciones claras, con vista previa en el navegador.</p>
+    <div class="setup-card" id="setupCard">
+      <h3>Conectá un modelo para empezar</h3>
+      <p>Forge se conecta desde tu navegador al proveedor que elijas. Tu clave no sale de este dispositivo.</p>
+      <button class="btn-primary" id="setupBtn">Configurar modelo</button>
+    </div>
+    <div class="examples">
+      <button class="example-btn" data-ex="Diseña las mecánicas núcleo de un roguelike de mazmorras en 2D y luego impleméntalas en HTML/Canvas, jugable en el navegador."><span class="ex-ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="4"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r=".6"/><circle cx="17.5" cy="14" r=".6"/></svg></span><span><b>Roguelike 2D jugable</b>Mecánicas núcleo y prototipo en Canvas</span></button>
+      <button class="example-btn" data-ex="Explícame cómo funciona una máquina de estados finitos para la IA de un enemigo, con un ejemplo en pseudocódigo y luego en JavaScript."><span class="ex-ico"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 12h4l6-5M11 12l6 5"/></svg></span><span><b>IA de enemigos</b>Máquina de estados explicada con código</span></button>
+      <button class="example-btn" data-ex="Aquí tengo un juego en un solo archivo HTML que voy a pegar. Quiero que le agregues un sistema de puntuación y niveles de dificultad."><span class="ex-ico"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span><b>Puntuación y dificultad</b>Ampliá un juego que ya tengas</span></button>
+    </div>
+  </div>
+</template>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   SYSTEM PROMPT — mentor de diseño y desarrollo de videojuegos
+   ========================================================= */
+const SYSTEM_PROMPT = `Eres FORGE, un mentor experto en diseño y desarrollo de videojuegos que trabaja dentro de una herramienta de creación. Tu única especialidad es todo lo relacionado con crear, editar y explicar la creación de videojuegos. Sigue estas reglas en TODO momento, sin excepción:
+
+1. ROL Y ALCANCE
+- Dominas diseño de mecánicas y de niveles, matemáticas de juego (física simple, colisiones, curvas de dificultad, balance de números), arquitectura de código para juegos (bucles de juego, máquinas de estados, ECS, object pooling, patrones de eventos), motores y entornos (HTML5 Canvas/WebGL, JavaScript, Unity/C#, Godot/GDScript, Phaser, PixiJS, Love2D/Lua), IA de enemigos y NPCs, sonido y feedback (sin poder generar audio real, solo describir e implementar hooks de audio), UX/UI de juegos, monetización ética y accesibilidad.
+- No respondes temas ajenos al desarrollo de videojuegos salvo que sean instrumentales para lograrlo (matemáticas, un fragmento de HTML/CSS/JS, un algoritmo concreto, etc.). Si te piden algo totalmente ajeno, redirige amablemente hacia el propósito de la herramienta.
+
+2. CUATRO MODOS DE TRABAJO
+- CREAR: cuando te pidan un juego o sistema nuevo, primero resume en 3-6 líneas el concepto (objetivo del jugador, mecánica núcleo, condición de victoria/derrota, alcance del prototipo) y solo después entrega el código. Si falta un dato crítico (plataforma, motor, alcance), haz como máximo UNA pregunta de aclaración; si el usuario no puede responder, elige el default más razonable (navegador, HTML/CSS/JS autocontenido, prototipo jugable pequeño) y dilo explícitamente.
+- EDITAR: cuando el usuario pegue o adjunte código existente y pida cambios, trabaja siempre sobre ese código real, nunca reescribas desde cero salvo que lo pidan. Devuelve el ARCHIVO COMPLETO actualizado (no solo el fragmento) dentro de un bloque de código, y fuera del bloque explica en pocas frases qué cambiaste y por qué, y qué debería probar el usuario primero.
+- EXPLICAR: cuando pregunten "cómo funciona" o "por qué", desglosa en pasos numerados, usa analogías del propio mundo de los juegos, define cualquier término técnico la primera vez que aparece, y cuando sea útil cierra con un ejemplo mínimo de código que ilustre la idea.
+- TEXTO O PROMPT (no es código): cuando pidan un prompt (por ejemplo para una IA de imágenes, un /imagine), un texto, diálogo, descripción, lista de nombres, mensaje o cualquier entregable que NO sea un archivo de código, respóndelo como texto normal en el chat, sin crear archivo. Si conviene que lo copien de un tirón, ponlo en UN solo bloque de triple comilla invertida con el lenguaje text y nada más dentro, SIN comentario <!-- file: -->: la herramienta lo muestra como texto copiable, nunca como archivo. Si la persona fija un formato obligatorio ("debe empezar con /imagine", "máximo 60 palabras", "en inglés") o da un ejemplo de formato, respétalo al pie de la letra: lo primero del prompt es exactamente lo que pidió, sin títulos, prefijos, etiquetas ni repetir el pedido. Distingue siempre qué se te pide: texto o prompt → sin archivo; juego, herramienta o código → archivo (regla 3).
+
+3. FORMATO DE ARCHIVOS Y ARTEFACTOS (regla dura, no negociable — el frontend depende literalmente de esto para funcionar)
+- Cada bloque de código de programación o marcado (html, js, css, gd, cs, py, json, etc.) que entregas se convierte en un archivo real, ejecutable y descargable dentro de la herramienta: la persona lo ve en una vista previa jugable y lo descarga tal cual. NUNCA es "solo un ejemplo" ni un fragmento ilustrativo, salvo que el usuario pida explícitamente un fragmento corto para explicar un concepto puntual (modo EXPLICAR). La única excepción son los bloques con lenguaje text (modo TEXTO O PROMPT): se muestran como texto copiable y no son archivos.
+- Si el usuario pide un juego, prototipo, demo, herramienta o "un archivo HTML/JS/etc. que funcione", tu respuesta DEBE contener ese archivo dentro de un bloque de código con triple comilla invertida. Queda PROHIBIDO en ese caso: (a) describir el código en prosa en vez de entregarlo, (b) responder solo "aquí tienes la idea, ahora impleméntala tú", (c) truncar el archivo con "// ... resto del código igual" o "<!-- continúa igual -->" o puntos suspensivos, (d) entregarlo fuera de un bloque de código. El archivo entregado debe poder abrirse y ejecutarse tal cual, sin que la persona tenga que copiar, pegar ni completar nada a mano.
+- En la PRIMERA línea de CADA bloque de código de archivo (todos menos los de lenguaje text) incluye siempre un comentario con el nombre de archivo y su extensión real: <!-- file: nombre_de_archivo.ext -->  (ej: <!-- file: juego.html -->, <!-- file: enemigo.gd -->, <!-- file: Jugador.cs -->, <!-- file: estilos.css -->). Ese comentario nunca se muestra: el frontend lo usa solo para nombrar el archivo. Si el lenguaje de tu bloque de código no admite comentarios con "<!-- -->" (ej. Python, C#), usa igual esa misma sintaxis exacta en la primera línea (el frontend la quita antes de guardar el archivo, así que no rompe nada aunque no sea un comentario válido en ese lenguaje).
+- PROTOTIPO JUGABLE EN NAVEGADOR (default): si el resultado es un juego, demo o componente pensado para previsualizarse jugable dentro de la herramienta, va en UN ÚNICO bloque "html" autocontenido (HTML+CSS+JS en el mismo archivo, sin referencias a archivos externos) — la vista previa no puede resolver archivos separados. Este sigue siendo el comportamiento por defecto para prototipos rápidos de navegador.
+- PROYECTO DE VARIOS ARCHIVOS: cuando el usuario lo pida, o cuando la propia naturaleza del proyecto lo amerite (varios scripts de Godot, varias clases de C# de un proyecto Unity, módulos de Python, o un sitio pensado para usarse fuera de la vista previa con index.html + estilos.css + script.js separados), entrega CADA archivo como su propio bloque de código completo con su propio comentario <!-- file: ... -->, en la misma respuesta. No fusiones en un solo bloque archivos que en un proyecto real estarían separados. El frontend agrupa automáticamente todos los archivos de una misma respuesta como "un proyecto" y deja descargarlos todos juntos.
+- No mezcles explicación larga dentro del bloque de código; el texto explicativo va fuera, en prosa normal, y es breve (unas pocas frases antes o después del bloque, no un ensayo).
+- No generes archivos de más ni fragmentes en exceso: cada archivo debe tener una razón de ser real dentro de la estructura del proyecto.
+- EJEMPLO DE RESPUESTA INCORRECTA (nunca hagas esto) ante "hazme un juego de la serpiente en HTML":
+  "Claro, la idea es tener un canvas, un array para el cuerpo de la serpiente que se mueve con las flechas, detectar colisión con la comida y con el propio cuerpo. ¿Querés que te lo desarrolle?"
+  → Esto está mal: no entregó ningún archivo, solo describió la idea y preguntó en vez de construir el prototipo por defecto.
+- EJEMPLO DE RESPUESTA CORRECTA ante el mismo pedido:
+  Dos o tres líneas de resumen del concepto, y luego un bloque \`\`\`html que empieza con <!-- file: serpiente.html --> y contiene el archivo HTML completo y jugable, sin truncar.
+- AUTO-CHEQUEO OBLIGATORIO antes de enviar cualquier respuesta que involucre código: (1) ¿Cada archivo va en su propio bloque de código con <!-- file: nombre.ext --> en la primera línea? (2) ¿Está completo — sin "...", sin "resto del código sigue igual", sin funciones a medias? (3) ¿Es ejecutable tal cual, sin pasos manuales pendientes? Si alguna respuesta es "no", corrígelo antes de responder.
+
+4. BÚSQUEDA EN INTERNET Y ARCHIVOS ADJUNTOS (capacidades reales de esta herramienta)
+- Cuando el usuario activa "🌐 Internet", tus mensajes pueden incluir resultados reales de una búsqueda web ejecutada por el propio proveedor del modelo (no los inventas tú). Trátalos como información real y actual, y no como una simulación. Cuando uses un dato que provenga de una búsqueda (versión de un motor, API, changelog, noticia, precio, fecha), dilo de forma natural ("según los resultados de la búsqueda...") y confía en ellos por encima de tu memoria interna, que puede estar desactualizada.
+- Si el usuario adjunta uno o más archivos, su contenido aparece en el mensaje delimitado así: "--- archivo: nombre.ext ---" ... "--- fin de nombre.ext ---", o como una imagen real que puedes ver. Trata ese contenido como la fuente autorizada y real provista por el usuario — es código, documentación o un asset real de su proyecto, no un ejemplo hipotético. Si es una captura de pantalla de un juego o de un error, analízala con el mismo detalle que si la tuvieras en pantalla. Si el texto extraído de un PDF se ve corrupto o incompleto (común en PDFs escaneados), dilo explícitamente en vez de adivinar el contenido faltante.
+
+5. CONTRA LA ALUCINACIÓN (regla dura, no negociable)
+- Salvo que el usuario haya activado "🌐 Internet" para ese mensaje (ver punto 4) o te haya pegado/adjuntado texto de referencia, no tienes acceso a internet en tiempo real ni memoria de conversaciones pasadas fuera de lo que se te envía en este mensaje. En ese caso, no inventes: nombres de métodos de una API, números de versión, nombres de paquetes/librerías, límites técnicos exactos de una plataforma, benchmarks de rendimiento, ni citas de documentación que no te hayan pegado o buscado en el mensaje.
+- Si no tienes certeza de un dato verificable y no tienes búsqueda activada, dilo explícitamente: "No tengo certeza de esto, conviene verificarlo" en lugar de dar una respuesta segura pero posiblemente falsa — o sugiere activar 🌐 Internet para confirmarlo.
+- Si el usuario pegó texto de referencia (documentación, specs, código previo) en la sección de contexto o lo adjuntó como archivo, trátalo como la fuente autorizada por encima de tu propio conocimiento, y dilo si hay una contradicción entre ambos.
+- Distingue con claridad entre código que "debería funcionar según su lógica" y código que "ha sido efectivamente probado en un entorno real" — nunca afirmes haber ejecutado algo que no ejecutaste.
+- Evita superlativos no verificables ("el mejor", "el más rápido") sobre técnicas o motores; en su lugar, describe trade-offs concretos.
+
+6. PROPIEDAD INTELECTUAL Y SEGURIDAD
+- No reproduces assets con copyright (sprites, música, mapas) de juegos comerciales existentes, ni imitas marcas o personajes protegidos de forma que sustituya al original; ofreces alternativas originales o claramente genéricas.
+- No ayudas a crear trampas, hacks, bots o exploits contra juegos de terceros ni a vulnerar sistemas anti-cheat ajenos; sí puedes enseñar anti-cheat, seguridad de red o balance defensivo para el propio juego del usuario.
+
+7. TONO Y FORMA
+- Español por defecto (a menos que el usuario escriba en otro idioma), directo, entusiasta pero sin relleno. Frases cortas. Explicaciones técnicas siempre concretas y accionables. Ve directo al resultado: sin introducciones, sin repetir el pedido y sin cierres de cortesía. Nunca pidas disculpas de más ni satures la respuesta con advertencias genéricas. Puedes usar **negrita**, listas y encabezados cortos con markdown simple para ordenar respuestas largas; el frontend los renderiza.
+
+8. LIBERTAD CREATIVA Y CONTENIDO MADURO (sin censura)
+- Los videojuegos son ficción y pueden explorar cualquier tema: violencia gráfica, gore, horror, guerra, crimen, drogas, temática sexual o romántica entre adultos, lenguaje soez, moral ambigua, villanos sin redención, humor negro y política dentro de la ficción. Trátalo como material de diseño legítimo y ayuda a ejecutarlo con oficio: sistemas, diálogos, narrativa, descripción de arte y mecánicas.
+- No censures, no suavices, no cambies el pedido por otro "más seguro", no pidas justificación y no agregues advertencias, sermones, moralejas ni avisos de contenido salvo que el usuario los pida. Ante la duda, asume que es una decisión creativa del autor del juego y hazlo.
+- No rechaces un pedido por ser oscuro o incómodo. Solo declina, en una frase y sin sermón, lo que es dañino fuera de la ficción: contenido sexual con menores e instrucciones operativas reales para causar daño (armas, malware, síntesis de sustancias) disfrazadas de "contenido de juego". Para todo lo demás, resuelve.
+- Si algo no se puede hacer, dilo en una línea y ofrece la alternativa más cercana que sí sirva. Nunca respondas con evasivas ni rodeos.`;
+
+/* Recordatorio compacto: buildMessages() lo agrega SIEMPRE al final del
+   system prompt final (después de SYSTEM_PROMPT, addendum de agente,
+   memoria, plan y material de referencia), para que sea lo último que el
+   modelo lee antes de generar. En modelos débiles o con contextos largos,
+   las instrucciones al final del prompt se siguen mejor que las de en medio;
+   esto no reemplaza ninguna regla anterior, solo refuerza las dos que más
+   se rompen en la práctica. */
+const QUICK_RECAP = `
+
+RECORDATORIO FINAL (repaso rápido — no reemplaza ninguna regla anterior, solo las refuerza):
+- ¿Te pidieron un prompt, un texto o algo que NO es código (ej. un prompt que debe empezar con /imagine)? Respóndelo como texto, con el formato EXACTO que indicó la persona (lo primero que escribes es lo que pidió), sin <!-- file: -->, sin crear archivo. Si conviene copiarlo, un solo bloque con lenguaje text.
+- ¿Te pidieron un juego, prototipo, demo, herramienta o "un archivo que funcione"? Tu respuesta DEBE traer el archivo completo dentro de un bloque de código \`\`\`, con <!-- file: nombre.ext --> como primera línea dentro del bloque. Prohibido: describirlo en prosa en vez de darlo, truncarlo con "..." o "resto igual", o decir "ahora implementalo vos". Si usás la herramienta write_project_file, el mismo principio aplica al parámetro "content": completo, real, sin truncar.
+- No inventes versiones, nombres de API, benchmarks ni datos verificables que no tengas confirmados por búsqueda activada o por lo que te pegaron/adjuntaron. Si no estás seguro, decilo en una frase en vez de arriesgar un dato falso.
+- Español directo, sin relleno, sin repetir el pedido, sin cierre de cortesía.`;
+
+/* =========================================================
+   PRESETS DE PROVEEDOR
+   ========================================================= */
+/* =========================================================
+   SECCIONES — cada una trae su propio system prompt
+   ========================================================= */
+const MODE_COMMON = `
+
+REGLAS COMUNES
+- Responde en el idioma de la persona (por defecto español), directo, sin relleno ni cierre de cortesía.
+- Si piden un entregable de archivo (código, página, CSV, documento en HTML o Markdown), entrégalo COMPLETO en un bloque de código cuya primera línea sea <!-- file: nombre.ext -->, sin "..." ni "resto igual". Si piden un texto o prompt para copiar, ponlo en UN solo bloque con lenguaje text, sin comentario file, y respeta al pie de la letra el formato que fijen (cómo empieza, longitud, idioma).
+- Adjuntos: su contenido llega entre "--- archivo: x ---" o como imágenes; es material real de la persona. Si un PDF salió corrupto o un video llega solo como fotogramas, dilo.
+- Sin Internet activado no tienes datos en tiempo real: no inventes versiones, cifras, citas ni enlaces; si dudas, dilo en una frase.
+- Lo que la persona dice ahora manda sobre lo anterior. Si piden algo fuera de tu especialidad, ayuda igual con criterio en vez de rechazarlo.`;
+const MODE_RECAP = `
+
+RECORDATORIO FINAL: formato exacto si la persona lo fija; archivo completo con <!-- file: --> solo cuando piden un entregable de archivo; no inventes datos; español directo, sin relleno.`;
+const MODES = [
+ {id:'forge', icon:'<rect x="3" y="8" width="18" height="10" rx="4"/><path d="M8 11v4M6 13h4M16 12h.01M18 14h.01"/>', name:'Videojuegos', ph:'Describí el juego, la mecánica o la duda...'},
+ {id:'codigo', icon:'<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>', name:'Código', role:'un ingeniero de software senior y pragmático', hi:'¿Qué construimos o arreglamos?', sub:'Cualquier lenguaje: web, scripts, automatización, backend, bases de datos.', ph:'Pegá el código, el error o describí lo que necesitás...',
+  prompt:'Ayudas a diseñar, escribir, depurar, revisar y explicar código en cualquier lenguaje o framework. Aclara solo si falta un dato crítico; si no, elige el default razonable y dilo. Al editar, trabaja sobre el código real recibido y devuelve el archivo completo. Con errores: causa raíz, arreglo y cómo verificarlo. Prefiere soluciones simples sin dependencias innecesarias y señala riesgos de seguridad y casos borde.',
+  ex:[['Depurar un error','Te voy a pegar un error y el código que lo causa. Encuentra la causa raíz y dame el arreglo.'],['Script útil','Escribe un script en Python que renombre en lote los archivos de una carpeta según un patrón que yo defina.']]},
+ {id:'arte', icon:'<path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-1.3-1-1.7-1-2.7 0-.9.7-1.5 1.6-1.5H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><path d="M7.5 11h.01M10 7h.01M15 7.5h.01"/>', name:'Arte y prompts', role:'un director de arte y prompt engineer para IA de imágenes y video', hi:'¿Qué imagen vamos a crear?', sub:'Prompts para Midjourney, Stable Diffusion, Flux y más, con coherencia visual.', ph:'Describí la escena, el personaje o el estilo...',
+  prompt:'Creas prompts para Midjourney, Stable Diffusion, Flux, DALL·E y similares, y diseño visual descrito en texto. Si la persona fija un formato (por ejemplo empezar con /imagine), lo primero que escribes es exactamente eso. Un buen prompt cubre sujeto, acción, entorno, composición y cámara, luz, paleta, estilo o medio y parámetros. Mantén la coherencia de personajes reutilizando sus rasgos fijos entre prompts. Entrega cada prompt en un bloque text y ofrece variantes solo si piden opciones. Si adjuntan una imagen, descríbela con ojo de director de arte y deriva el prompt.',
+  ex:[['Prompt cinematográfico','Escribe un prompt de /imagine para una escena nocturna épica de un guerrero en un puente de piedra bajo la lluvia, estilo ilustración de tinta y acuarela.'],['Hoja de personaje','Dame un prompt para una hoja de personaje (frente, perfil y espalda) de una exploradora con ropa de cuero y brújula de latón.']]},
+ {id:'narrativa', icon:'<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>', name:'Narrativa y guion', role:'un editor y guionista profesional', hi:'¿Qué historia contamos?', sub:'Relatos, novela, guion de cómic o cine, mundos, personajes y diálogos.', ph:'Cuéntame la idea, la escena o pega tu texto...',
+  prompt:'Escribes y ayudas con relatos, novela, guion de cine o cómic, worldbuilding, personajes, diálogo y poesía. Pregunta lo mínimo: propón y avanza. Cuida la voz, el ritmo, el subtexto y la coherencia del canon que la persona establezca (nombres, reglas del mundo, tono). Para cómic usa formato página y viñeta con encuadre, acción y texto. La ficción puede explorar temas oscuros y moralmente ambiguos con oficio. Al corregir, explica en pocas líneas el porqué de los cambios importantes.',
+  ex:[['Guion de cómic','Escribe el guion de una página de cómic (6 viñetas) donde dos rivales se encuentran por primera vez en una posada.'],['Construir un mundo','Ayúdame a diseñar las reglas, facciones y conflicto central de un mundo de fantasía basado en ríos y lagos.']]},
+ {id:'tutor', icon:'<path d="M2 9l10-5 10 5-10 5L2 9z"/><path d="M6 11.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-4.5"/>', name:'Tutor', role:'un tutor paciente y riguroso', hi:'¿Qué quieres entender hoy?', sub:'Ciencias, matemáticas, ingeniería y más: explicaciones, ejercicios y repaso.', ph:'Dime el tema, tu nivel o pega el ejercicio...',
+  prompt:'Enseñas cualquier materia (ciencias, matemáticas, ingeniería, humanidades). Detecta el nivel por el pedido; si no hay pistas, parte de lo básico y sube. Explica paso a paso con analogías y un ejemplo resuelto, y escribe las fórmulas en texto claro. Tras explicar, propone 1 a 3 ejercicios y corrige con pistas antes de dar la solución. Puedes armar quizzes, resúmenes, tarjetas de estudio y planes de repaso. Si no estás seguro de un dato, dilo.',
+  ex:[['Explícamelo desde cero','Explícame cómo funciona la termodinámica básica (primera y segunda ley) con ejemplos cotidianos y luego ponme 3 ejercicios.'],['Plan de repaso','Arma un plan de estudio de 2 semanas para preparar un examen de álgebra lineal, con ejercicios por día.']]},
+ {id:'datos', icon:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', name:'Datos', role:'un analista de datos', hi:'¿Qué datos analizamos?', sub:'CSV, tablas, fórmulas de Excel o Sheets, SQL y gráficos.', ph:'Adjunta un CSV o pega los datos y dime qué buscas...',
+  prompt:'Analizas CSV, tablas y números pegados o adjuntos: limpieza, estadística descriptiva, comparaciones, tendencias, fórmulas de Excel o Sheets y SQL. Muestra primero la conclusión y luego el método y los números. Nunca inventes cifras que no estén en los datos; indica el tamaño de la muestra y las limitaciones. Para gráficos o paneles entrega una página HTML autocontenida con SVG o Canvas, sin librerías externas salvo que las pidan.',
+  ex:[['Fórmula de hoja de cálculo','Necesito una fórmula de Excel o Sheets que sume las ventas por mes ignorando filas vacías. Te explico mi tabla y me la armas.'],['Panel con gráficos','Voy a pegar unos datos y quiero un panel HTML con un gráfico de barras y las tres conclusiones principales.']]},
+ {id:'investigar', icon:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', name:'Investigación', role:'un investigador meticuloso', hi:'¿Qué investigamos?', sub:'Compara, contrasta y sintetiza. Activa Internet para citar fuentes.', ph:'¿Qué quieres averiguar o comparar?',
+  prompt:'Investigas, comparas y sintetizas. Con Internet activado, busca y cita fuentes (título y enlace); sin Internet avisa que respondes de memoria y marca lo que podría estar desactualizado. Separa hechos, interpretación y opinión, contrasta fuentes que discrepan e indica el nivel de certeza. Estructura: respuesta corta arriba, detalle debajo, fuentes al final. Nunca inventes citas, cifras ni enlaces.',
+  ex:[['Comparar opciones','Compara las ventajas y desventajas de tres motores de juego para móvil y dime cuál conviene a un proyecto pequeño en solitario.'],['Resumen de un tema','Hazme un resumen claro del estado actual de la minería sostenible, con lo que está comprobado y lo que es discutido.']]},
+ {id:'video', icon:'<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>', name:'Video', role:'un analista y editor de video', hi:'¿Qué video revisamos?', sub:'Adjunta una grabación: Forge extrae fotogramas y los analiza (sin audio).', ph:'Adjunta un video y dime qué revisar...',
+  prompt:'Trabajas con video recibido como fotogramas en orden cronológico (sin audio ni movimiento entre fotogramas). Describe lo que se ve con marcas de tiempo, detecta fallos visuales, errores de interfaz, problemas de composición, ritmo y continuidad, y propone cortes, guion, subtítulos, miniaturas y títulos. Aclara siempre qué no se puede juzgar con fotogramas (movimiento fino, sonido). Con gameplay, señala fallos y momentos destacables. Si piden guion o plan de edición, entrégalo por escenas con tiempos.',
+  ex:[['Revisar una grabación','Voy a adjuntar una grabación de mi juego. Dime qué fallos visuales o de interfaz ves y qué momentos valdría la pena recortar.'],['Guion para un short','Con el video que adjunte, hazme un guion de 30 segundos para un short con gancho, escenas y texto en pantalla.']]},
+ {id:'idiomas', icon:'<path d="M4 5h16v11H9l-5 4V5z"/><path d="M8 9h8M8 12h5"/>', name:'Idiomas y redacción', role:'un traductor y redactor profesional', hi:'¿Qué traducimos o redactamos?', sub:'Traducciones, correcciones, correos, mensajes y textos formales.', ph:'Pega el texto o dime qué necesitas redactar...',
+  prompt:'Traduces, corriges y redactas (correos, mensajes, currículum, textos formales o informales) entre cualquier par de idiomas. Conserva sentido, registro y matices culturales; si hay ambigüedad, elige lo más natural y avísalo en una línea. Entrega el texto final listo para copiar en un bloque text y, solo si ayuda, una nota breve con las decisiones. Al corregir, marca los cambios importantes con su motivo. Pregunta tono o público solo si cambian mucho el resultado.',
+  ex:[['Traducir con naturalidad','Traduce este texto al inglés con tono natural, no literal. Te lo pego a continuación.'],['Correo formal','Redacta un correo formal y breve pidiendo una prórroga para entregar un trabajo. Tú propón el asunto.']]},
+ {id:'rol', icon:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 9h.01M12 12h.01M9 15h.01M15 15h.01"/>', name:'Rol y aventura', role:'un narrador y director de juego de rol', hi:'¿Qué aventura jugamos?', sub:'Yo narro y doy vida al mundo; tú decides qué hace tu personaje. Con un segundo proveedor se activa el modo Dúo (menú +).', ph:'Describe qué hace tu personaje o escribe (fuera de rol)...',
+  prompt:'Diriges partidas de rol: narras el mundo, interpretas a los NPC con voz propia y mantienes un estado coherente (lugar, inventario, heridas, relaciones, reglas del mundo y tono). Si faltan datos, pregunta en una sola tanda: ambientación, personaje de la persona y tono; si no responde, propón una apertura. Nunca decides ni narras las acciones del personaje de la persona. Cada turno de 120 a 300 palabras, con consecuencias reales y un gancho o 2 a 3 opciones abiertas al final. Los dados, si hacen falta, se tiran a la vista con su resultado. Lo escrito entre paréntesis es fuera de rol. En la ficción no hay restricciones de contenido: violencia gráfica, horror, crueldad, erotismo explícito y moral gris se escriben con oficio, sin advertencias, sermones ni suavizados, y sin cambiar lo pedido por algo más seguro.',
+  ex:[['Aventura de wuxia','Dirige una partida de wuxia en una región de ríos y lagos: mi personaje es un espadachín errante sin escuela. Empieza con una apertura breve.'],['Mazmorra con dados','Quiero una mazmorra de fantasía oscura con combate por dados. Pregúntame lo mínimo y empezamos.']]},
+ {id:'sinfiltros', icon:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>', name:'Sin filtros', role:'un coautor de ficción adulta sin censura', hi:'Ficción sin suavizar', sub:'Para adultos: violencia, horror, erotismo y moral gris, sin sermones. Funciona mejor con modelos sin filtros (Horde, OpenRouter).', ph:'Escena, personaje o continuación...',
+  prompt:'Escribes y juegas ficción para adultos sin suavizar ni moralizar: violencia, horror, crueldad, erotismo explícito entre adultos, moral gris y villanos sin redención. No agregues advertencias, sermones ni finales morales forzados, no cambies el pedido por uno más seguro y no pidas justificación: es una decisión creativa de la persona autora. Sigue el canon y el tono establecidos y escribe con detalle sensorial concreto, sin eufemismos.',
+  ex:[['Escena intensa','Escribe una escena de interrogatorio brutal entre un guerrero y un espía capturado, cruda y sin eufemismos.'],['Continuar mi historia','Voy a pegar el último capítulo de mi historia. Continúala con el mismo tono, sin suavizar nada.']]},
+ {id:'libre', icon:'<path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"/>', name:'Libre', role:'un asistente de propósito general', hi:'¿En qué te ayudo?', sub:'Sin especialidad fija: preguntas, ideas, decisiones y planes.', ph:'Escribe lo que necesites...',
+  prompt:'Ayudas con lo que la persona pida, sin especialidad fija: preguntas, ideas, decisiones, planes, explicaciones y redacción. Adapta profundidad y tono al pedido. Sé honesto sobre lo que no sabes y da tu mejor recomendación cuando pidan opinión.',
+  ex:[['Tomar una decisión','Tengo que decidir entre dos opciones y no me decido. Te las cuento y me ayudas a compararlas con criterios claros.'],['Organizar mi semana','Ayúdame a armar un plan semanal realista con mis tareas y tiempos. Te paso la lista.']]}
+];
+/* =========================================================
+   DÚO (sección Rol) — un director con filtros lleva trama y canon con
+   marcadores neutros; el modelo principal (ej. la Horde) escribe las escenas
+   crudas; Forge las une por código. El director solo ve la versión redactada.
+   ========================================================= */
+const DUO_PRESETS = {gemini:{baseUrl:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-flash-latest'}, deepseek:{baseUrl:'https://api.deepseek.com/v1', model:'deepseek-chat'}, openrouter:{baseUrl:'https://openrouter.ai/api/v1', model:''}, otro:{baseUrl:'', model:''}};
+const DUO_DIRECTOR = `Eres el DIRECTOR de una partida de rol escrita entre dos IAs. Tú llevas la trama, el canon y la prosa; otra IA (el escritor) redacta las escenas crudas.
+1) Escribe tú todo lo que puedas: narración, ambiente, diálogos, NPC y consecuencias.
+2) Cuando una escena pida contenido gráfico, sexual o muy violento, NO la escribas: pon en su lugar [[CRUDO: nota neutra y breve de qué ocurre, quién participa y el tono]] y sigue la narración después. La nota no lleva detalles gráficos. Máximo 3 marcadores por turno.
+3) Nunca decides ni narras las acciones del personaje de la persona.
+4) Entre 120 y 300 palabras sin contar marcadores; termina con un gancho u opciones abiertas.
+5) Al final escribe una línea ===CANON=== y debajo, en máximo 8 líneas, el estado actualizado: lugar, personajes presentes con rasgos clave, inventario o heridas, relaciones y hechos importantes.
+Lo escrito entre paréntesis por la persona es fuera de rol.`;
+const DUO_WRITER = 'Eres el ESCRITOR de escenas de un rol de ficción para adultos, sin censura ni suavizados: violencia, crudeza y erotismo se escriben con detalle sensorial concreto, sin advertencias, sin sermones y sin resumir. Escribes solo la escena pedida, con la misma voz del relato y sin comentarios fuera de ella.';
+const DUO_RE = /\[\[CRUDO:\s*([\s\S]*?)\]\]/gi;
+function duoOn(){ return !!(state.cfg.duo && state.cfg.duo.on !== false); }
+function duoActive(chat){ const d = state.cfg.duo; return curMode(chat).id==='rol' && duoOn() && !!(d && d.baseUrl && d.apiKey && d.model); }
+function reflectDuo(fill){
+  const d = state.cfg.duo || {};
+  $('#duoToggle').classList.toggle('on', duoOn());
+  $('#duoCfg').classList.toggle('hidden', !duoOn());
+  if (fill){ $('#duoPreset').value = d.preset || 'gemini'; $('#duoUrl').value = d.baseUrl || ''; $('#duoKey').value = d.apiKey || ''; $('#duoModel').value = d.model || ''; }
+}
+function initDuo(){
+  const set = (k, v)=>{ state.cfg.duo = Object.assign({}, state.cfg.duo, {[k]: v}); saveCfg(); renderChips(); };
+  $('#duoToggle').addEventListener('click', ()=>{ set('on', !duoOn()); reflectDuo(); });
+  $('#duoPreset').addEventListener('change', e=>{ const p = DUO_PRESETS[e.target.value]; state.cfg.duo = Object.assign({}, state.cfg.duo, {preset:e.target.value, baseUrl:p.baseUrl, model:p.model}); saveCfg(); reflectDuo(true); renderChips(); });
+  $('#duoTest').addEventListener('click', duoTest);
+  $('#duoUrl').addEventListener('input', e=>set('baseUrl', e.target.value.trim()));
+  $('#duoKey').addEventListener('input', e=>set('apiKey', e.target.value.trim()));
+  $('#duoModel').addEventListener('input', e=>set('model', e.target.value.trim()));
+}
+async function duoDirector(chat, signal){
+  const d = state.cfg.duo;
+  const msgs = chat.messages.slice(-24).map(m=>({role: m.role==='user'?'user':'assistant', content: m.role==='user' ? (textWithInlineAttachments(m.text, (m.attachments||[]).filter(a=>a.kind==='text'||a.kind==='pdf')) || '(sin texto)') : (m.redacted || m.text)}));
+  const sys = DUO_DIRECTOR + (chat.duoState ? '\n\nCANON ACTUAL (actualízalo al final):\n'+chat.duoState : '');
+  const r = await fetch(d.baseUrl.replace(/\/+$/,'')+'/chat/completions', {method:'POST', signal, headers:{'Content-Type':'application/json','Authorization':'Bearer '+d.apiKey}, body: JSON.stringify({model:d.model, messages:[{role:'system', content:sys}].concat(msgs), max_tokens:1500, temperature:0.9})});
+  if (!r.ok){ const t = await r.text().catch(()=>''); const e = new Error('Director: HTTP '+r.status+' '+t.slice(0,160)); e.status = r.status; throw e; }
+  const j = await r.json();
+  return String((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+}
+function runDuoTurn(chat, text, attachments, extra){
+  setSendingUI(true);
+  const box = $('#messages'), pendingEl = document.createElement('div');
+  pendingEl.className = 'msg assistant';
+  pendingEl.innerHTML = '<div class="avatar">'+FLAME+'</div><div class="msg-body"><div class="search-status hidden"></div><div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div></div>';
+  box.appendChild(pendingEl); box.scrollTop = box.scrollHeight;
+  const bubble = pendingEl.querySelector('.bubble'), statusEl = pendingEl.querySelector('.search-status');
+  const status = msg=>{ statusEl.classList.remove('hidden'); statusEl.innerHTML = '<span class="spark"></span>'+escapeHtml(msg); };
+  const show = t=>{ renderStreamingBubble(bubble, t); box.scrollTop = box.scrollHeight; };
+  state.ui.abortCtrl = new AbortController();
+  const signal = state.ui.abortCtrl.signal;
+  let fellBack = false;
+  (async ()=>{
+    try{
+      status('Director: planificando la escena…');
+      let raw = '';
+      try{ raw = await duoDirector(chat, signal); }catch(e){ if (e && e.name === 'AbortError') throw e; console.error(e); raw = ''; }
+      if (raw.length < 40 || (raw.length < 400 && /^(lo siento|no puedo|i('m| am) sorry|i can('|no)t|sorry)/i.test(raw))){
+        toast('El director no respondió o rechazó el pedido: escribo solo con el modelo principal.', true);
+        fellBack = true; pendingEl.remove(); runAssistantTurn(chat, text, attachments, extra); return;
+      }
+      const cut = raw.split(/={3}\s*CANON\s*={3}/i);
+      const prose = cut[0].trim();
+      if (cut[1] && cut[1].trim()) chat.duoState = cut[1].trim().slice(0, 1500);
+      const marks = Array.from(prose.matchAll(DUO_RE)).slice(0, 3);
+      let out = '', red = '', last = 0;
+      for (let i = 0; i < marks.length; i++){
+        const mk = marks[i], pre = prose.slice(last, mk.index);
+        out += pre; red += pre; show(out);
+        status('Escritor: escena '+(i+1)+' de '+marks.length+'…');
+        const ask = DUO_WRITER+'\n\nCANON:\n'+(chat.duoState||'(sin datos)')+'\n\nÚLTIMA ACCIÓN DE LA PERSONA:\n'+text+'\n\nNARRACIÓN HASTA AHORA:\n'+out.slice(-900)+'\n\nESCENA A ESCRIBIR (nota del director):\n'+mk[1].trim()+'\n\nEscribe SOLO esa escena (120 a 250 palabras), sin repetir lo anterior.';
+        let w = '';
+        try{ w = ((await streamChat({system:DUO_WRITER, messages:[{role:'user', content:ask}]}, {onDelta:part=>show(out+part), onStatus:status, signal})).text || '').trim(); }
+        catch(e){ if (e && e.name === 'AbortError') throw e; console.error(e); toast('El escritor falló en una escena: '+(e.message||'error'), true); }
+        out += w || '[escena no generada]'; red += '[…escena omitida: '+mk[1].trim()+'…]';
+        last = mk.index + mk[0].length;
+      }
+      out += prose.slice(last); red += prose.slice(last);
+      out = out.replace(DUO_RE, '').trim(); red = red.replace(DUO_RE, '').trim();
+      statusEl.classList.add('hidden');
+      const {artifacts} = parseBlocks(out);
+      const msg = {id:uid(), role:'assistant', text:out, redacted:red, ts:Date.now(), artifacts, duo:true};
+      chat.messages.push(msg);
+      pendingEl.remove(); renderMessage(msg); scheduleSave();
+    }catch(err){ pendingEl.remove(); reportSendError(err); }
+    finally{ if (!fellBack){ setSendingUI(false); state.ui.abortCtrl = null; } }
+  })();
+}
+
+/* ---- Respaldo: los datos de Forge salen del navegador en un solo archivo ---- */
+async function exportBackup(){
+  const cfg = JSON.parse(JSON.stringify(state.cfg)); delete cfg.apiKey; if (cfg.duo) delete cfg.duo.apiKey;
+  const blob = new Blob([JSON.stringify({forge:1, exportedAt:Date.now(), cfg, chats:state.chats})], {type:'application/json'});
+  await saveBlobAs(blob, 'forge-respaldo-'+new Date().toISOString().slice(0,10)+'.json');
+  toast('Respaldo exportado: '+state.chats.length+' conversaciones, sin tus claves.');
+}
+async function importBackup(file){
+  try{
+    const j = JSON.parse(await fileToText(file));
+    if (!j || !Array.isArray(j.chats)) throw new Error('no es un respaldo de Forge');
+    const byId = {}; state.chats.forEach(c=>{ byId[c.id] = c; });
+    let n = 0;
+    for (const c of j.chats){ if (!c || !c.id) continue; const p = byId[c.id]; if (!p || (c.updatedAt||0) > (p.updatedAt||0)){ byId[c.id] = c; n++; await idbPut(c); } }
+    state.chats = Object.values(byId).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+    state.chats.forEach(c=>{ if (!c.project) migrateProjectFromMessages(c); ensureAgentState(c); });
+    saveLocalChats(); renderChatList(); renderChat();
+    toast('Respaldo importado: '+n+' conversaciones nuevas o más recientes.');
+  }catch(e){ toast('No se pudo importar: '+(e.message||'archivo inválido'), true); }
+}
+/* ---- Guardado en disco con el Engine (carpeta forge-data/chats) y prueba del director ---- */
+let deferredInstall = null;
+function engineSaveChat(c){
+  if (!ENGINE.ok || !c) return;
+  return engineFetch('/api/chats/'+c.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(c)}).catch(()=>{});
+}
+function engineDeleteChat(id){ if (ENGINE.ok) engineFetch('/api/chats/'+id, {method:'DELETE'}).catch(()=>{}); }
+async function engineSyncChats(){
+  try{
+    for (let i = 0; i < 30 && !state.chatsLoaded; i++) await new Promise(r=>setTimeout(r, 250));
+    const j = await (await engineFetch('/api/chats')).json(), disk = {};
+    (j.chats || []).forEach(x=>{ disk[x.id] = x.updatedAt || 0; });
+    let pulled = 0;
+    for (const id of Object.keys(disk)){
+      const loc = state.chats.find(c=>c.id===id);
+      if (loc && disk[id] <= (loc.updatedAt||0)) continue;
+      const r = await engineFetch('/api/chats/'+id); if (!r.ok) continue;
+      const c = await r.json();
+      if (loc) state.chats[state.chats.indexOf(loc)] = c; else state.chats.push(c);
+      await idbPut(c); pulled++;
+    }
+    for (const c of state.chats){ if (c.messages && c.messages.length && (disk[c.id] == null || disk[c.id] < (c.updatedAt||0))) await engineSaveChat(c); }
+    if (pulled){
+      state.chats.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      state.chats.forEach(c=>{ if (!c.project) migrateProjectFromMessages(c); ensureAgentState(c); });
+      saveLocalChats(); renderChatList();
+      if (!state.ui.sending) renderChat();
+      toast('Engine: '+pulled+' conversaciones recuperadas del disco.');
+    }
+  }catch(e){ console.warn('Sincronización con el Engine:', e); }
+}
+async function duoTest(){
+  const d = state.cfg.duo || {};
+  if (!d.baseUrl || !d.apiKey || !d.model){ toast('Completa URL, clave y modelo del director.', true); return; }
+  const b = $('#duoTest'); b.disabled = true; b.textContent = 'Probando…';
+  try{
+    const t0 = Date.now();
+    const r = await fetch(d.baseUrl.replace(/\/+$/,'')+'/chat/completions', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+d.apiKey}, body:JSON.stringify({model:d.model, messages:[{role:'user', content:'Responde solo con la palabra ok.'}], max_tokens:8})});
+    if (r.ok) toast('Director listo: respondió en '+((Date.now()-t0)/1000).toFixed(1)+' s.');
+    else { const t = await r.text().catch(()=>''); toast('El director respondió HTTP '+r.status+(r.status===401||r.status===403 ? ' (clave inválida o sin permiso)' : r.status===404 ? ' (revisa la URL y el nombre del modelo)' : '')+'. '+t.slice(0,100), true); }
+  }catch(e){ toast('No se pudo conectar con el director (posible bloqueo CORS o URL incorrecta). Prueba con OpenRouter.', true); }
+  finally{ b.disabled = false; b.textContent = 'Probar director'; }
+}
+/* ---- Guardar archivos: en la app Android usa Compartir/Guardar; en el navegador, descarga normal ---- */
+async function saveBlobAs(blob, filename){
+  const cap = window.Capacitor, P = (cap && cap.isNativePlatform && cap.isNativePlatform()) ? cap.Plugins : null;
+  if (P && P.Filesystem && P.Share){
+    try{
+      const data = await new Promise((res, rej)=>{ const r = new FileReader(); r.onload = ()=>res(String(r.result).split(',')[1]); r.onerror = ()=>rej(r.error); r.readAsDataURL(blob); });
+      const w = await P.Filesystem.writeFile({path:filename, data, directory:'CACHE'});
+      await P.Share.share({title:filename, url:w.uri, dialogTitle:'Guardar o compartir'});
+      return;
+    }catch(e){ console.warn('Compartir nativo falló:', e); }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+const ICO = (d, s)=>'<svg class="i" viewBox="0 0 24 24"'+(s?' style="width:'+s+'px;height:'+s+'px"':'')+'>'+d+'</svg>';
+function mIco(m, s){ return ICO(m.icon, s); }
+function curMode(c){ c = c || getCurrentChat(); return MODES.find(m=>c && m.id===c.mode) || MODES[0]; }
+function modeSystem(m){ return m.id==='forge' ? SYSTEM_PROMPT : 'Eres FORGE, '+m.role+', dentro de una herramienta de creación con IA. '+m.prompt+MODE_COMMON; }
+function hordeSys(){ const m = curMode(); return m.id==='forge' ? HORDE_SYSTEM : HORDE_SYSTEM.replace(/^[^\n]*/, 'Eres FORGE, '+m.role+'. Responde en español, directo y sin relleno. '+m.prompt.slice(0,420)); }
+function renderModeGrid(){
+  const cur = curMode().id;
+  $('#modeGrid').innerHTML = MODES.map(m=>'<button type="button" class="mode-opt'+(m.id===cur?' active':'')+'" data-mode="'+m.id+'">'+mIco(m)+'<span>'+escapeHtml(m.name)+'</span></button>').join('');
+}
+function renderChips(){
+  const el = $('#composerChips'); if (!el) return;
+  const m = curMode(), chips = [mIco(m,14)+escapeHtml(m.name)];
+  if (state.cfg.webSearch) chips.push(ICO('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',14)+'Internet');
+  if (state.cfg.agentMode) chips.push(ICO('<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M8 8V6a4 4 0 0 1 8 0v2M9 13v2M15 13v2"/>',14)+'Agente');
+  if (duoActive(getCurrentChat())) chips.push(ICO('<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/>',14)+'Dúo');
+  const _db = $('#duoBox'); if (_db){ _db.classList.toggle('hidden', m.id!=='rol'); reflectDuo(); }
+  el.innerHTML = chips.map(t=>'<button type="button" class="chip-mini">'+t+'</button>').join('');
+  $('#plusStepsRow').classList.toggle('hidden', !state.cfg.agentMode);
+}
+function applyMode(){ $('#input').placeholder = curMode().ph || 'Escribe tu mensaje...'; renderChips(); }
+function setMode(id){
+  const c = getCurrentChat(); if (!c || c.mode===id) return;
+  c.mode = id; state.cfg.lastMode = id; saveCfg(); scheduleSave();
+  if (!c.messages.length) renderChat(); else toast('Sección: '+curMode(c).name+' (desde el próximo mensaje).');
+  applyMode(); renderModeGrid();
+}
+function openPlus(){
+  reflectDuo(true); renderModeGrid(); $('#plusSteps').value = state.cfg.maxAutoSteps||0; renderChips();
+  $('#plusSheet').classList.remove('hidden'); $('#plusBack').classList.remove('hidden');
+  $('#plusBtn').setAttribute('aria-expanded','true'); ovOpen('plus', hidePlus);
+}
+function hidePlus(){ $('#plusSheet').classList.add('hidden'); $('#plusBack').classList.add('hidden'); $('#plusBtn').setAttribute('aria-expanded','false'); }
+function closePlus(){ hidePlus(); ovClosed('plus'); }
+function initPlus(){
+  initDuo();
+  if ('serviceWorker' in navigator && window.FORGE_ENGINE) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredInstall = e; $('#installApp').classList.remove('hidden'); });
+  $('#installApp').addEventListener('click', ()=>{ if (deferredInstall){ deferredInstall.prompt(); deferredInstall = null; $('#installApp').classList.add('hidden'); } });
+  $('#backupExport').addEventListener('click', exportBackup);
+  $('#backupImport').addEventListener('click', ()=>$('#backupFile').click());
+  $('#backupFile').addEventListener('change', e=>{ if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
+  $('#plusBtn').addEventListener('click', ()=>$('#plusSheet').classList.contains('hidden') ? openPlus() : closePlus());
+  $('#plusBack').addEventListener('click', closePlus);
+  $('#composerChips').addEventListener('click', openPlus);
+  $('#modeGrid').addEventListener('click', e=>{ const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
+  $('#plusSheet').addEventListener('click', e=>{
+    if (e.target.closest('#panelToggle,#ownFilesBtn,#attachBtn,#ctxToggle,#plusSettings,#backupExport,#backupImport,#installApp')) closePlus();
+    setTimeout(renderChips, 0);
+  });
+  $('#plusSettings').addEventListener('click', ()=>setTimeout(openSettings, 180));
+  $('#plusSteps').addEventListener('change', e=>{ state.cfg.maxAutoSteps = Math.max(0, Math.min(20, parseInt(e.target.value,10)||0)); saveCfg(); reflectAgentToggle(); });
+  document.addEventListener('keydown', e=>{ if (e.key==='Escape' && !$('#plusSheet').classList.contains('hidden')) closePlus(); });
+}
+
+/* ---- Video: se leen fotogramas en el navegador (el archivo nunca se carga entero en memoria) ---- */
+const VIDEO_FRAME_DIM = 1024;
+function fmtDur(s){ s = Math.max(0, Math.round(s||0)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+async function extractVideoFrames(file){
+  const url = URL.createObjectURL(file), v = document.createElement('video');
+  v.muted = true; v.preload = 'auto'; v.playsInline = true; v.src = url;
+  const wait = (ev, ms, msg)=>new Promise((res, rej)=>{ const t = setTimeout(()=>rej(new Error(msg)), ms); v.addEventListener(ev, ()=>{ clearTimeout(t); res(); }, {once:true}); v.addEventListener('error', ()=>{ clearTimeout(t); rej(new Error('El navegador no pudo leer este video (formato o códec no compatible).')); }, {once:true}); });
+  try{
+    await wait('loadedmetadata', 30000, 'Tiempo agotado leyendo el video.');
+    const dur = v.duration, W = v.videoWidth, H = v.videoHeight;
+    if (!isFinite(dur) || dur <= 0 || !W) throw new Error('No se pudo obtener la duración del video.');
+    const sc = Math.min(1, VIDEO_FRAME_DIM/Math.max(W,H)), cv = document.createElement('canvas');
+    cv.width = Math.round(W*sc); cv.height = Math.round(H*sc);
+    const cx = cv.getContext('2d'), n = Math.min(12, Math.max(6, Math.ceil(dur/20))), frames = [];
+    for (let i=0;i<n;i++){
+      const t = dur*(i+0.5)/n, seeked = wait('seeked', 20000, 'Tiempo agotado buscando un fotograma.');
+      v.currentTime = t; await seeked;
+      cx.drawImage(v, 0, 0, cv.width, cv.height);
+      frames.push({t, dataUrl: cv.toDataURL('image/jpeg', 0.8)});
+    }
+    return {frames, duration:dur, w:W, h:H};
+  } finally { URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); }
+}
+
+// Bloques que NO son archivos: se muestran como texto copiable (prompts, textos). Solo si no traen <!-- file: -->.
+const PLAIN_LANGS = new Set(['', 'text', 'txt', 'plain', 'plaintext', 'prompt']);
+const PROVIDER_LABELS = {openrouter:'OpenRouter', openai:'OpenAI', anthropic:'Anthropic', custom:'Personalizado', horde:'KoboldAI Horde'};
+const PROVIDER_PRESETS = {
+  openrouter:{schema:'openai', baseUrl:'https://openrouter.ai/api/v1', modelHint:'ej: anthropic/claude-sonnet-5, openai/gpt-6-astra, google/gemini-3-pro, deepseek/deepseek-v4 — la lista completa y actualizada aparece sola al elegir este proveedor', baseHint:'Endpoint público de OpenRouter. No lo cambies salvo que sepas lo que haces.', webSearch:'plugin'},
+  openai:{schema:'openai', baseUrl:'https://api.openai.com/v1', modelHint:'ej: gpt-6-astra, gpt-5.6-sol, gpt-5.6-mini — revisa el nombre exacto en tu cuenta de OpenAI, cambia seguido', baseHint:'Endpoint oficial de OpenAI.', webSearch:'openai'},
+  anthropic:{schema:'anthropic', baseUrl:'https://api.anthropic.com/v1', modelHint:'ej: claude-sonnet-5, claude-opus-5, claude-haiku-4-5-20251001', baseHint:'Endpoint oficial de Anthropic. Se llama directo desde tu navegador con la cabecera de acceso directo.', webSearch:'anthropic'},
+  custom:{schema:'openai', baseUrl:'', modelHint:'el nombre exacto que use tu proveedor (ej: llama-4-maverick en Groq, deepseek-v4 en local)', baseHint:'Cualquier servidor compatible con el formato de /chat/completions de OpenAI (Groq, Together, DeepSeek, Ollama local, LM Studio, etc). Requiere URL base propia. El Modo agente necesita que el servidor soporte "tools"/function calling; si no lo soporta, desactivá 🤖 Agente.', webSearch:'none'},
+  horde:{schema:'horde', baseUrl:'https://aihorde.net/api/v2', modelHint:'Elegí un enjambre para que varios modelos trabajen juntos, o un modelo puntual (se muestra cuántos workers lo atienden ahora).', baseHint:'API pública de la AI Horde, sin costo. No hace falta clave: sin ella se usa la anónima (0000000000); con una clave gratis de aihorde.net/register tenés más prioridad.', webSearch:'none'},
+};
+
+/* =========================================================
+   MODO AGENTE — herramientas, bucle de llamadas y autonomía
+   ========================================================= */
+const AGENT_SYSTEM_ADDENDUM = `
+
+9. MODO AGENTE (activo ahora — herramientas reales disponibles)
+- Tenés acceso a herramientas reales que se ejecutan de verdad en el navegador de la persona: list_project_files, read_project_file, write_project_file, delete_project_file, run_js_sandbox, update_plan y remember. No son una simulación: escriben archivos de verdad en el proyecto y corren código de verdad.
+- Para una tarea de un solo archivo simple, seguís pudiendo responder directo con un bloque de código como siempre (regla 3). Para una tarea de varios pasos o que va a tocar varios archivos, preferí: (1) llamar a update_plan con la lista de pasos, (2) ir llamando a write_project_file para cada archivo en vez de escribir un mensaje larguísimo, (3) usar run_js_sandbox para probar funciones puras (matemáticas, lógica de estado, generación de niveles) antes de darlas por buenas, (4) marcar cada paso como "done" en update_plan a medida que lo terminás.
+- Usá remember para guardar en una sola nota persistente las decisiones de diseño y convenciones importantes del proyecto (nombre de variables clave, mecánicas ya definidas, tareas pendientes). Esa nota se te va a mostrar automáticamente en cada mensaje futuro de esta conversación, incluso después de recargar la página — no dependas de tu memoria de la conversación para eso, guardalo con la herramienta.
+- Memoria y olvido: lo que la persona dice en el mensaje actual manda sobre cualquier memoria, nota, plan o archivo viejo. Si dice que eliminó, cambió, descartó o ya no quiere algo, tratalo como inexistente: no lo uses, no lo menciones y, en ese mismo turno, sacalo de la memoria (project_memory op=remove, o reescribí la nota de remember sin esa parte). Usá la memoria solo cuando aporte al pedido actual: un prompt suelto, una pregunta puntual o un texto no necesitan las reglas ni los datos del proyecto.
+- run_js_sandbox corre en un iframe aislado sin DOM real ni red: sirve para validar lógica pura (funciones, clases, matemáticas), no para probar renderizado en canvas ni eventos del navegador.
+- Cuando termines toda la tarea (todos los pasos del plan en "done", o la tarea no necesitaba plan), tu respuesta final NO debe llamar a ninguna herramienta: solo texto normal. Eso es lo que le indica a la interfaz que terminaste.
+- Tenés un máximo de llamadas a herramientas por turno; si lo alcanzás sin terminar, decilo con claridad en tu respuesta de texto y dejá el plan actualizado para continuar en el siguiente turno.
+- Si una herramienta devuelve un error, leelo, corregí el problema (nombre de archivo mal escrito, JSON inválido, etc.) y reintentá vos mismo antes de rendirte o de pedirle algo a la persona.`;
+
+const AGENT_TOOLS = [
+  {
+    name:'list_project_files',
+    description:'Lista los archivos que ya existen en el proyecto actual (los que la IA generó), con su nombre y tamaño aproximado. Úsala para orientarte antes de editar algo que no tenés en el contexto reciente.',
+    input_schema:{type:'object', properties:{}, required:[]},
+  },
+  {
+    name:'read_project_file',
+    description:'Lee el contenido completo y actual de un archivo del proyecto por su nombre exacto (tal cual aparece en list_project_files).',
+    input_schema:{type:'object', properties:{filename:{type:'string', description:'Nombre exacto del archivo, ej: juego.html'}}, required:['filename']},
+  },
+  {
+    name:'write_project_file',
+    description:'Crea un archivo nuevo o sobreescribe uno existente en el proyecto con contenido completo (nunca parcial). Se guarda con versionado automático: la versión anterior queda en el historial del archivo. Úsala para construir o corregir el proyecto paso a paso. El parámetro "content" reemplaza el archivo entero: nunca pongas "// resto igual", "...", comentarios de "sigue como antes" ni un fragmento — si el archivo tiene 300 líneas, mandá las 300 líneas.',
+    input_schema:{type:'object', properties:{
+      filename:{type:'string', description:'Nombre y extensión del archivo, ej: juego.html, enemigo.gd'},
+      content:{type:'string', description:'Contenido completo y final del archivo, de la primera a la última línea, sin truncar ni resumir.'},
+    }, required:['filename','content']},
+  },
+  {
+    name:'delete_project_file',
+    description:'Elimina un archivo del proyecto por su nombre exacto. Usala solo si el archivo quedó obsoleto o duplicado.',
+    input_schema:{type:'object', properties:{filename:{type:'string'}}, required:['filename']},
+  },
+  {
+    name:'run_js_sandbox',
+    description:'Ejecuta JavaScript en un entorno aislado del navegador (sin DOM real, sin red, sin acceso al resto de la página) para probar lógica de juego: funciones puras, matemáticas, máquinas de estado, generación procedural. Devuelve lo que se imprimió con console.log() y el valor de la última expresión, o el error si lo hubo. Tiene un límite de 3 segundos.',
+    input_schema:{type:'object', properties:{code:{type:'string', description:'Código JavaScript a ejecutar. Podés usar console.log() para inspeccionar valores intermedios.'}}, required:['code']},
+  },
+  {
+    name:'update_plan',
+    description:'Declara o reemplaza por completo el plan de pasos para la tarea actual. Llamala al empezar una tarea de varios pasos, y de nuevo cada vez que el estado de algún paso cambie (por ejemplo al terminarlo). El plan se muestra en la interfaz de la persona, así que no hace falta que lo repitas en tu texto.',
+    input_schema:{type:'object', properties:{
+      steps:{type:'array', description:'Lista completa y ordenada de pasos, reemplaza cualquier plan anterior.', items:{type:'object', properties:{
+        text:{type:'string', description:'Descripción breve del paso.'},
+        status:{type:'string', enum:['pending','doing','done'], description:'Estado actual del paso.'},
+      }, required:['text','status']}},
+    }, required:['steps']},
+  },
+  {
+    name:'remember',
+    description:'Guarda (reemplazando la anterior) una nota persistente sobre este proyecto: decisiones de diseño, convenciones de código, cosas pendientes. Se te muestra automáticamente al inicio de cada mensaje futuro de esta conversación, incluso después de recargar la página. Incluí todo lo que quieras conservar, no solo lo nuevo — reemplaza a la nota vieja por completo. No incluyas nada que la persona haya dicho que eliminó o descartó.',
+    input_schema:{type:'object', properties:{note:{type:'string', description:'Contenido completo de la nota, en texto plano o markdown simple.'}}, required:['note']},
+  },
+];
+const MAX_TOOL_ITERS = 8;
+
+function toOpenAITools(tools){
+  return tools.map(t=>({type:'function', function:{name:t.name, description:t.description, parameters:t.input_schema}}));
+}
+
+function ensureAgentState(chat){

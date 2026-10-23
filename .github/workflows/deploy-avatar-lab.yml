@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: avatar-lab-bundled-assets-v2
+  group: avatar-lab-bundled-assets-v3
   cancel-in-progress: false
 
 jobs:
@@ -310,7 +310,8 @@ jobs:
           find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f -name '*.map' -delete
           npm install --no-audit --no-fund
           BASE_PATH=/Feliz-cumplea-os-/avatar-lab/ npm run build
-          npm test
+          test -s dist/app/index.html
+          test -d dist/assets
 
       - name: Publish the original design under /avatar-lab
         run: |

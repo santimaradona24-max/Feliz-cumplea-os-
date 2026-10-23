@@ -1,0 +1,434 @@
+name: Build Avatar Lab mobile preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-avatar-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: avatar-lab-mobile-build
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout my repository
+        uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Get the real character engine
+        run: git clone --depth 1 https://github.com/olatunde85/3d-gen.git "$RUNNER_TEMP/ara"
+
+      - name: Apply Avatar Lab integration
+        run: |
+          export ARA_DIR="$RUNNER_TEMP/ara"
+          python3 - <<'PY'
+          import json, os, textwrap
+          from pathlib import Path
+
+          root = Path(os.environ["ARA_DIR"])
+          def read(p): return (root / p).read_text(encoding="utf-8")
+          def write(p, s): (root / p).write_text(s, encoding="utf-8")
+          def once(s, old, new, label):
+              n = s.count(old)
+              if n != 1: raise SystemExit("Patch stopped: " + label + " (anchors=" + str(n) + ")")
+              return s.replace(old, new, 1)
+
+          # Map existing anatomy morphs onto the requested visible age range.
+          p = read("src/core/params.ts")
+          a = p.index("/** MakeHuman age value <-> years. */")
+          b = p.index("export const PRESETS:", a)
+          age = '''/** Avatar Lab: map 10–60 years to the available MakeHuman age morph lattice. */
+          export function ageToYears(a: number): number {
+            const v = Math.max(0.1875, Math.min(0.85, Number(a) || 0.1875));
+            if (v <= 0.5) return 10 + ((v - 0.1875) / 0.3125) * 15;
+            return 25 + ((v - 0.5) / 0.35) * 35;
+          }
+          export function yearsToAge(y: number): number {
+            const years = Math.max(10, Math.min(60, Number(y) || 10));
+            if (years <= 25) return 0.1875 + ((years - 10) / 15) * 0.3125;
+            return 0.5 + ((years - 25) / 35) * 0.35;
+          }
+
+          '''
+          write("src/core/params.ts", p[:a] + age + p[b:])
+
+          avl_ts = r'''import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+          import type { Catalog, Slider } from "../core/assets";
+          import type { HumanParams } from "../core/params";
+          import "./avatarlab.css";
+
+          type Options = {
+            panel: HTMLElement; main: HTMLElement; controls: HTMLElement; catalog: Catalog;
+            getParams: () => HumanParams; setParams: (patch: Partial<HumanParams>) => void;
+            onRandomize: () => void; onExport: () => void; onDownload: () => void;
+            onShare: () => void; onFaceView: (on: boolean) => void; onDetailHigh: () => void;
+          };
+          const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+          let faceTask: FaceLandmarker | undefined;
+          const categories: Record<string,string> = {
+            Body:"Cuerpo", Ethnicity:"Etnia y rasgos", "Skin & eyes":"Piel y ojos", Hair:"Cabello",
+            Expression:"Expresión", "Facial hair":"Barba y bigote", Tattoos:"Tatuajes",
+            Clothing:"Vestuario", Accessories:"Accesorios", Weapon:"Armas", Output:"Calidad y exportación"
+          };
+          const labels: Record<string,string> = {
+            Gender:"Género", Age:"Edad", Muscle:"Musculatura", Weight:"Volumen corporal", Height:"Estatura",
+            Proportions:"Proporciones", African:"Rasgos africanos", Asian:"Rasgos asiáticos", Caucasian:"Rasgos europeos",
+            "Skin tint":"Tono de piel", "Outfit tint":"Color del conjunto", "Beard colour":"Color de barba",
+            "Beard color":"Color de barba", "Hair tint":"Tinte de cabello", "Hair colour":"Color de cabello",
+            "Hair color":"Color de cabello", Expression:"Expresión", Teeth:"Dientes", Top:"Prenda superior",
+            Bottom:"Prenda inferior", "Underwear (briefs)":"Ropa interior", Footwear:"Calzado", Hat:"Sombrero"
+          };
+          function translate(root: HTMLElement) {
+            root.querySelectorAll<HTMLDetailsElement>("#controls > details").forEach((d) => {
+              const h = d.querySelector<HTMLElement>(":scope > summary");
+              if (h) {
+                const original = h.dataset.avlOriginal || h.textContent?.trim() || "";
+                h.dataset.avlOriginal = original;
+                if (categories[original]) h.textContent = categories[original];
+                else if (/ details$/i.test(original)) h.textContent = original.replace(/ details$/i, " · detalles");
+              }
+              d.querySelectorAll<HTMLElement>(".ctl > span:first-child, .sub, .hint").forEach((el) => {
+                const text = el.textContent?.trim() || "";
+                if (labels[text] && el.dataset.avlTranslated !== "1") {
+                  el.textContent = labels[text]; el.dataset.avlTranslated = "1";
+                }
+              });
+            });
+          }
+          function dist(lm: {x:number;y:number;z:number}[], image: ImageBitmap, a: number, b: number) {
+            return Math.hypot((lm[a].x-lm[b].x)*image.width, (lm[a].y-lm[b].y)*image.height);
+          }
+          function sliderText(s: Slider) {
+            return (s.id + " " + s.label + " " + (s.targets || []).flat().filter(Boolean).join(" ")).toLowerCase();
+          }
+          function measureFace(catalog: Catalog, params: HumanParams, lm: {x:number;y:number;z:number}[], image: ImageBitmap) {
+            const d = (a:number,b:number) => dist(lm,image,a,b);
+            const width = Math.max(1,d(234,454)), height = Math.max(1,d(10,152));
+            const fs = [
+              {label:"ancho del rostro",ratio:width/height,base:.73,range:.18,re:/head\/head-scale-horiz|head.*(width|scale-horiz)/},
+              {label:"anchura de mandíbula",ratio:d(172,397)/width,base:.72,range:.18,re:/chin\/chin-width|jaw.*width|chin.*width/},
+              {label:"tamaño de ojos",ratio:((d(33,133)+d(362,263))/2)/width,base:.23,range:.10,re:/eye.*(size|scale|width)|eyes.*(size|scale|width)/},
+              {label:"anchura de nariz",ratio:d(129,358)/width,base:.27,range:.12,re:/nose\/.*(scale-horiz|width)|nose.*(width|broad)/},
+              {label:"anchura de boca",ratio:d(61,291)/width,base:.40,range:.15,re:/mouth\/.*(scale-horiz|width)|mouth.*(width|broad)/},
+              {label:"longitud de mentón",ratio:d(17,152)/height,base:.19,range:.10,re:/chin\/.*(scale-vert|height|prominent)|chin.*(length|height)/}
+            ];
+            const all = catalog.sliders.flatMap((g) => g.sliders), used = new Set<string>();
+            const matched:string[] = [], missed:string[] = [], modifiers = {...params.modifiers};
+            for (const f of fs) {
+              const best = all.find((s) => !used.has(s.id) && f.re.test(sliderText(s)));
+              if (!best) { missed.push(f.label); continue; }
+              used.add(best.id);
+              const delta = clamp((f.ratio-f.base)/f.range,-1,1)*.72, current = Number(modifiers[best.id] || 0);
+              modifiers[best.id] = best.bipolar ? clamp(current+delta,-1,1) : clamp(current+Math.max(0,delta),0,1);
+              matched.push(f.label);
+            }
+            return {modifiers,matched,missed};
+          }
+          async function getTask() {
+            if (faceTask) return faceTask;
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm");
+            const common = {runningMode:"IMAGE" as const,numFaces:1,outputFaceBlendshapes:false,outputFacialTransformationMatrixes:false};
+            try {
+              faceTask = await FaceLandmarker.createFromOptions(vision,{...common,baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate:"GPU"}});
+            } catch {
+              faceTask = await FaceLandmarker.createFromOptions(vision,{...common,baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate:"CPU"}});
+            }
+            return faceTask;
+          }
+          export function installAvatarLab(o: Options) {
+            const toolbar = document.createElement("div"); toolbar.id = "avl-toolbar";
+            const status = document.createElement("div"); status.id = "avl-status"; status.setAttribute("role","status");
+            status.textContent = "Foto a rostro: elegí una imagen frontal para crear una base facial editable.";
+            const input = document.createElement("input"); input.type="file"; input.accept="image/*"; input.hidden=true;
+            const addButton = (text:string,title:string,run:()=>void) => {
+              const b=document.createElement("button"); b.type="button"; b.textContent=text; b.title=title;
+              b.setAttribute("aria-label",title); b.addEventListener("click",run); toolbar.append(b);
+            };
+            addButton("Foto","Crear una base facial desde una foto",()=>input.click());
+            addButton("Rostro","Acercar o alejar la cámara del rostro",()=>{
+              const face=document.querySelector<HTMLInputElement>("#face");
+              const on=!(face?.checked||false); if(face) face.checked=on; o.onFaceView(on);
+            });
+            addButton("HD","Alternar nivel de detalle",o.onDetailHigh);
+            addButton("Aleatorio","Generar otro personaje",o.onRandomize);
+            addButton("Opciones","Abrir opciones de exportación",o.onExport);
+            addButton("Guardar","Descargar el personaje",o.onDownload);
+            o.main.append(toolbar,status,input);
+            Array.from(o.controls.querySelectorAll<HTMLDetailsElement>(":scope > details")).forEach((d,i)=>{d.open=i===0;});
+            translate(o.panel);
+            new MutationObserver(()=>translate(o.panel)).observe(o.controls,{subtree:true,childList:true,characterData:true});
+            input.addEventListener("change",async()=>{
+              const file=input.files?.[0]; if(!file) return;
+              let bitmap:ImageBitmap|undefined; status.style.display="block"; status.textContent="Analizando la foto localmente…";
+              try {
+                bitmap=await createImageBitmap(file);
+                const result=(await getTask()).detect(bitmap), lm=result.faceLandmarks?.[0];
+                if(!lm){status.textContent="No detecté el rostro. Probá una foto frontal, enfocada y bien iluminada.";return;}
+                const r=measureFace(o.catalog,o.getParams(),lm,bitmap);
+                if(!r.matched.length){status.textContent="Detecté la cara, pero no encontré morphs compatibles en el catálogo.";return;}
+                o.setParams({modifiers:r.modifiers});
+                status.textContent="Base facial aplicada: "+r.matched.length+" rasgos editables."+(r.missed.length?" Sin morph compatible: "+r.missed.join(", ")+".":"");
+              } catch(e) {
+                console.error(e); status.textContent="No pude analizar la foto: "+(e instanceof Error?e.message:String(e));
+              } finally { bitmap?.close(); input.value=""; }
+            });
+          }
+          '''
+          (root / "src/app/avatarlab.ts").write_text(avl_ts, encoding="utf-8")
+
+          css = r'''
+          :root { --bg:#111814; --panel:#1b251f; --panel-2:#263129; --text:#f0f2e8; --muted:#a4b09f; --accent:#d5b46c; --border:#405044; }
+          #avl-toolbar { position:absolute; z-index:8; top:10px; left:10px; right:10px; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+          #avl-toolbar::-webkit-scrollbar { display:none; }
+          #avl-toolbar button { flex:0 0 auto; border:1px solid var(--border); border-radius:10px; padding:8px 11px; background:#17231edd; color:var(--text); font-size:12px; font-weight:750; box-shadow:0 4px 14px #0003; backdrop-filter:blur(10px); }
+          #avl-toolbar button:first-child, #avl-toolbar button:nth-child(3) { color:#15201a; background:var(--accent); border-color:var(--accent); }
+          #avl-status { position:absolute; z-index:9; bottom:58px; left:10px; right:10px; padding:9px 12px; border:1px solid #536956; border-radius:12px; background:#111b17ed; color:var(--text); font-size:11px; line-height:1.35; box-shadow:0 8px 26px #0006; }
+          @media(max-width:760px) {
+            html,body { height:100%; height:100dvh; overflow:hidden; overscroll-behavior:none; }
+            body { flex-direction:column-reverse; }
+            #panel { width:100%; height:41%; flex:none; min-height:0; overflow:hidden; border:0; border-top:1px solid var(--border); background:linear-gradient(180deg,#1b251f,#121914); }
+            main { width:100%; height:59%; flex:none; min-height:0; overflow:hidden; background:radial-gradient(ellipse at 50% 45%,#38473b,#111713 72%); }
+            #viewport { width:100%; height:100%; touch-action:pan-y; }
+            #panel header { padding:7px 10px; position:relative; border-bottom:1px solid var(--border); background:var(--panel); }
+            #panel h1 { margin:0; font-size:15px; } #panel h1 span { display:none; }
+            #panel header .row { margin-top:5px; gap:6px; } #panel header .row:last-child { display:none; }
+            #controls { height:calc(100% - 58px); overflow-y:auto; overscroll-behavior:contain; padding-bottom:env(safe-area-inset-bottom); }
+            #controls > details { border-bottom:1px solid #34453a; }
+            #controls summary { padding:10px 13px; font-size:13px; color:#e8d6a3; }
+            #controls details > div { padding:0 12px 12px; gap:9px; }
+            .ctl { grid-template-columns:105px minmax(55px,1fr) 37px; gap:6px; } .ctl.wide { grid-template-columns:96px minmax(0,1fr); }
+            input[type=range] { min-height:26px; } .picker { grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); }
+            #stats { display:none; }
+            #view-tools { top:auto; bottom:106px; right:8px; gap:4px; }
+            #view-tools label { background:#17231dbd; border:1px solid #435447; border-radius:8px; padding:4px 6px; font-size:10px; color:#e9efe5; }
+            #anim-bar { top:auto; bottom:58px; left:8px; right:8px; max-width:none; width:auto; transform:none; flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding:5px; gap:4px; border-radius:11px; background:#111b17e8; border-color:#46584a; scrollbar-width:none; }
+            #anim-bar button, #anim-bar select { flex:0 0 auto; font-size:10px; padding:5px 7px; }
+            #export { bottom:8px; left:8px; right:8px; transform:none; width:auto; justify-content:center; gap:5px; padding:5px; border-radius:11px; background:#101914ed; border-color:#46584a; }
+            #export button { min-width:0; font-size:10px; padding:7px 8px; }
+            #avl-status { bottom:101px; font-size:10px; }
+            #avl-toolbar { top:8px; left:8px; right:8px; gap:5px; }
+            #avl-toolbar button { padding:7px 9px; font-size:11px; }
+            button { touch-action:manipulation; }
+          }
+          '''
+          (root / "src/app/avatarlab.css").write_text(css, encoding="utf-8")
+
+          main = read("src/app/main.ts")
+          main = once(main, "import { Viewer } from './viewer';", "import { Viewer } from './viewer';\nimport { installAvatarLab } from './avatarlab';", "mobile module import")
+          lines = main.splitlines()
+          found = False
+          for i,line in enumerate(lines):
+              if "slider('Age'" in line:
+                  if found: raise SystemExit("More than one age slider line")
+                  found = True
+                  lines[i] = line.replace(", 12, 90, 1,", ", 10, 60, 1,").replace(" y" + chr(96), " años" + chr(96))
+          if not found: raise SystemExit("Age slider line not found")
+          main = "\n".join(lines) + "\n"
+          main = once(main, "(v) => (v < 0.35 ? 'female' : v > 0.65 ? 'male' : 'mixed')", "(v) => (v < 0.35 ? 'Femenino' : v > 0.65 ? 'Masculino' : 'Mixto')", "gender labels")
+          initial = "let params: HumanParams = loadSaved() ?? { ...DEFAULT_PARAMS, name: 'Athletic man' };"
+          main = once(main, initial, initial + "\nparams = { ...params, age: yearsToAge(Math.max(10, Math.min(60, ageToYears(params.age)))) };", "normalise saved age")
+          old_set = textwrap.dedent("""\
+          function set(patch: Partial<HumanParams>) {
+            params = { ...params, ...patch };
+            if ('age' in patch || 'outfit' in patch) sync.forEach((f) => f());
+            regenerate();
+          }
+
+          function replaceAll(p: HumanParams) {
+            params = p;
+            sync.forEach((f) => f());
+            regenerate();
+          }""")
+          new_set = textwrap.dedent("""\
+          function set(patch: Partial<HumanParams>) {
+            params = { ...params, ...patch };
+            params.age = yearsToAge(Math.max(10, Math.min(60, ageToYears(params.age))));
+            if ('age' in patch || 'outfit' in patch) sync.forEach((f) => f());
+            regenerate();
+          }
+
+          function replaceAll(p: HumanParams) {
+            params = { ...p, age: yearsToAge(Math.max(10, Math.min(60, ageToYears(p.age)))) };
+            sync.forEach((f) => f());
+            regenerate();
+          }""")
+          main = once(main, old_set, new_set, "normalise age for presets and controls")
+          init = """installAvatarLab({
+            panel: $('#panel'), main: $('main'), controls, catalog: cat,
+            getParams: () => params, setParams: (patch) => set(patch),
+            onRandomize: () => $('#randomize').click(),
+            onExport: () => $('#export-summary').click(), onDownload: () => $('#export-go').click(),
+            onShare: () => $('#share-btn').click(),
+            onFaceView: (on) => { const input = $<HTMLInputElement>('#face'); input.checked = on; viewer.focusFace(on); },
+            onDetailHigh: () => set({ detail: params.detail === 'high' ? 'medium' : 'high' }),
+          });
+          """
+          main = once(main, "// URL options: #c=", init + "\n// URL options: #c=", "toolbar initialisation")
+          write("src/app/main.ts", main)
+
+          # Use compatible CC0 skin maps from adjacent age groups, blended on the generation worker.
+          human = read("src/core/human.ts")
+          helper = r'''const avlSkinBlendCache = new Map<string, Promise<string | undefined>>();
+          async function autoSkinWithAgeBlend(lib: AssetLibrary, p: HumanParams, skins: CatalogItem[]): Promise<CatalogItem> {
+            const nearest = autoSkin(p, skins);
+            try {
+              if (typeof OffscreenCanvas === "undefined" || typeof createImageBitmap === "undefined") return nearest;
+              const years = Math.max(10, Math.min(60, ageToYears(p.age))), bin = Math.round(years / 5) * 5;
+              const race = p.african >= p.asian && p.african >= p.caucasian ? "african" : p.asian >= p.caucasian ? "asian" : "caucasian";
+              const sex = p.gender >= 0.5 ? "male" : "female";
+              const firstTag = bin <= 30 ? "young" : "middleage", secondTag = bin <= 30 ? "middleage" : "old";
+              const t = bin <= 30 ? (bin - 10) / 20 : (bin - 30) / 30;
+              const findSkin = (tag: string) => skins.find((s) => {
+                const m = /^(young|middleage|old)_(african|asian|caucasian)_(male|female)(\d*)$/.exec(s.id);
+                return !!m && m[1] === tag && m[2] === race && m[3] === sex;
+              });
+              const a = findSkin(firstTag), b = findSkin(secondTag);
+              if (!a?.material?.diffuse || !b?.material?.diffuse) return nearest;
+              if (t <= 0.001) return a; if (t >= 0.999) return b;
+              const key = race + "_" + sex + "_" + bin, output = "avl_skin_" + key + ".jpg";
+              if (!lib.hasTexture(output)) {
+                let promise = avlSkinBlendCache.get(key);
+                if (!promise) {
+                  promise = (async () => {
+                    const [aa, bb] = await Promise.all([lib.texture(a.material!.diffuse!), lib.texture(b.material!.diffuse!)]);
+                    const blob = (bytes: Uint8Array, name: string) => new Blob([bytes.slice().buffer as ArrayBuffer], {type:name.endsWith(".png")?"image/png":"image/jpeg"});
+                    const [ia, ib] = await Promise.all([createImageBitmap(blob(aa,a.material!.diffuse!)),createImageBitmap(blob(bb,b.material!.diffuse!))]);
+                    const canvas = new OffscreenCanvas(ia.width,ia.height), ctx = canvas.getContext("2d");
+                    if (!ctx) { ia.close(); ib.close(); return undefined; }
+                    ctx.globalAlpha=1; ctx.drawImage(ia,0,0,canvas.width,canvas.height);
+                    ctx.globalAlpha=t; ctx.drawImage(ib,0,0,canvas.width,canvas.height); ctx.globalAlpha=1;
+                    ia.close(); ib.close();
+                    const out = await canvas.convertToBlob({type:"image/jpeg",quality:0.92});
+                    lib.registerTexture(output,new Uint8Array(await out.arrayBuffer())); return output;
+                  })().catch((e)=>{console.warn("[Avatar Lab] skin blend fallback",e);return undefined;});
+                  avlSkinBlendCache.set(key,promise);
+                }
+                if (!await promise) return nearest;
+              }
+              const representative=t<0.5?a:b;
+              return {...representative,id:"avl_"+key,material:{...representative.material!,diffuse:output}};
+            } catch(e) { console.warn("[Avatar Lab] age texture fallback",e); return nearest; }
+          }
+
+          '''
+          human = once(human, "function fit(", helper + "function fit(", "skin blend helper")
+          human = once(human, "const skin = p.skin === 'auto' ? autoSkin(p, cat.skins) : find(cat.skins, p.skin) ?? autoSkin(p, cat.skins);",
+              "const skin = p.skin === 'auto' ? await autoSkinWithAgeBlend(lib, p, cat.skins) : find(cat.skins, p.skin) ?? autoSkin(p, cat.skins);",
+              "age texture selection")
+          write("src/core/human.ts", human)
+
+          viewer = read("src/app/viewer.ts")
+          viewer = once(viewer, "this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));",
+              "this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia('(max-width: 760px)').matches ? 1.5 : 2));",
+              "mobile pixel budget")
+          old_mat = textwrap.dedent("""\
+          const mat = new THREE.MeshStandardMaterial({
+            name: mt.name,
+            color: new THREE.Color(mt.color),
+            roughness: mt.roughness,
+            metalness: mt.metalness,
+            map: mt.map ? this.texture(mt.map, true) : null,
+            normalMap: mt.normalMap ? this.texture(mt.normalMap, false) : null,
+            side: mt.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+            emissive: mt.emissive ? new THREE.Color(mt.emissive) : new THREE.Color(0),
+            emissiveIntensity: mt.emissive ? 1.6 : 0,
+            wireframe: this.wireframe,
+          });""")
+          new_mat = textwrap.dedent("""\
+          const materialOptions: THREE.MeshStandardMaterialParameters = {
+            name: mt.name,
+            color: new THREE.Color(mt.color),
+            roughness: mt.roughness,
+            metalness: mt.metalness,
+            map: mt.map ? this.texture(mt.map, true) : null,
+            normalMap: mt.normalMap ? this.texture(mt.normalMap, false) : null,
+            side: mt.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+            emissive: mt.emissive ? new THREE.Color(mt.emissive) : new THREE.Color(0),
+            emissiveIntensity: mt.emissive ? 1.6 : 0,
+            wireframe: this.wireframe,
+          };
+          const mat = mt.name === 'Skin'
+            ? new THREE.MeshPhysicalMaterial({ ...materialOptions, sheen:0.12, sheenRoughness:0.86, clearcoat:0.02, clearcoatRoughness:0.7, specularIntensity:0.55 })
+            : new THREE.MeshStandardMaterial(materialOptions);""")
+          viewer = once(viewer, old_mat, new_mat, "PBR skin material")
+          write("src/app/viewer.ts", viewer)
+
+          pkg_path = root / "package.json"
+          pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
+          pkg.setdefault("dependencies", {})["@mediapipe/tasks-vision"] = "^1.1.1"
+          pkg_path.write_text(json.dumps(pkg, indent=2) + "\n", encoding="utf-8")
+
+          css = read("src/app/style.css") + r'''
+          :root { --bg:#111814; --panel:#1b251f; --panel-2:#263129; --text:#f0f2e8; --muted:#a4b09f; --accent:#d5b46c; --border:#405044; }
+          @media(max-width:760px) {
+            html,body { height:100%; height:100dvh; overflow:hidden; overscroll-behavior:none; }
+            body { flex-direction:column-reverse; }
+            #panel { width:100%; height:41%; flex:none; min-height:0; overflow:hidden; border:0; border-top:1px solid var(--border); background:linear-gradient(180deg,#1b251f,#121914); }
+            main { width:100%; height:59%; flex:none; min-height:0; overflow:hidden; background:radial-gradient(ellipse at 50% 45%,#38473b,#111713 72%); }
+            #viewport { width:100%; height:100%; touch-action:pan-y; }
+            #panel header { padding:7px 10px; position:relative; border-bottom:1px solid var(--border); background:var(--panel); }
+            #panel h1 { margin:0; font-size:15px; } #panel h1 span { display:none; }
+            #panel header .row { margin-top:5px; gap:6px; } #panel header .row:last-child { display:none; }
+            #controls { height:calc(100% - 58px); overflow-y:auto; overscroll-behavior:contain; padding-bottom:env(safe-area-inset-bottom); }
+            #controls > details { border-bottom:1px solid #34453a; }
+            #controls summary { padding:10px 13px; font-size:13px; color:#e8d6a3; }
+            #controls details > div { padding:0 12px 12px; gap:9px; }
+            .ctl { grid-template-columns:105px minmax(55px,1fr) 37px; gap:6px; } .ctl.wide { grid-template-columns:96px minmax(0,1fr); }
+            input[type=range] { min-height:26px; } .picker { grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); }
+            #stats { display:none; }
+            #view-tools { top:auto; bottom:106px; right:8px; gap:4px; }
+            #view-tools label { background:#17231dbd; border:1px solid #435447; border-radius:8px; padding:4px 6px; font-size:10px; color:#e9efe5; }
+            #anim-bar { top:auto; bottom:58px; left:8px; right:8px; max-width:none; width:auto; transform:none; flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; padding:5px; gap:4px; border-radius:11px; background:#111b17e8; border-color:#46584a; scrollbar-width:none; }
+            #anim-bar button, #anim-bar select { flex:0 0 auto; font-size:10px; padding:5px 7px; }
+            #export { bottom:8px; left:8px; right:8px; transform:none; width:auto; justify-content:center; gap:5px; padding:5px; border-radius:11px; background:#101914ed; border-color:#46584a; }
+            #export button { min-width:0; font-size:10px; padding:7px 8px; }
+            #avl-status { bottom:101px; font-size:10px; }
+            #avl-toolbar { top:8px; left:8px; right:8px; gap:5px; }
+            #avl-toolbar button { padding:7px 9px; font-size:11px; }
+            button { touch-action:manipulation; }
+          }
+          '''
+          write("src/app/style.css", css)
+          print("Avatar Lab source modifications were applied.")
+          PY
+
+      - name: Install dependencies, download CC0 assets and run checks
+        run: |
+          cd "$RUNNER_TEMP/ara"
+          npm install --no-audit --no-fund
+          npm run setup-assets
+          BASE_PATH=/Feliz-cumplea-os-/avatar-lab/ npm run build
+          npm test
+
+      - name: Publish under /avatar-lab without changing the existing homepage
+        run: |
+          rm -rf avatar-lab
+          mkdir -p avatar-lab
+          cp "$RUNNER_TEMP/ara/dist/app/index.html" avatar-lab/index.html
+          cp -a "$RUNNER_TEMP/ara/dist/assets" avatar-lab/assets
+          for f in favicon.ico favicon.svg apple-touch-icon.png icon-192.png icon-512.png site.webmanifest; do
+            if [ -f "$RUNNER_TEMP/ara/dist/$f" ]; then cp "$RUNNER_TEMP/ara/dist/$f" "avatar-lab/$f"; fi
+          done
+          printf '%s\n' 'Avatar Lab mobile test build' > avatar-lab/BUILD_INFO.txt
+
+      - name: Commit the app files only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add avatar-lab/
+          if git diff --cached --quiet; then
+            echo "No generated site changes."
+          else
+            git commit -m "Build Avatar Lab mobile test app"
+            git push
+          fi

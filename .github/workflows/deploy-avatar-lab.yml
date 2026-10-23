@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: avatar-lab-bundled-assets-v3
+  group: avatar-lab-bundled-assets-v4
   cancel-in-progress: false
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
         run: |
           export ARA_DIR="$RUNNER_TEMP/ara"
           python3 - <<'PY'
-          import os, textwrap
+          import os, textwrap, re
           from pathlib import Path
 
           root = Path(os.environ["ARA_DIR"])
@@ -259,7 +259,7 @@ jobs:
                 const isHair = piece.kind === 'hair';
                 const color = isHair ? p.pubicHairColor : piece.kind === 'detail' ? tint(anatomyColor, '#edc9b9') : anatomyColor;
                 parts.push([skinOf(piece.mesh, 4), {
-                  name: isHair ? 'Pubic hair' : piece.kind === 'detail' ? 'Intimate details' : 'Intimate anatomy',
+                  name: isHair ? 'Pubic hair' : piece.kind === 'detail' ? 'Intimate details' : 'Skin',
                   color, roughness: isHair ? 0.94 : 0.67, metalness: 0,
                   alpha: 'opaque', doubleSided: true,
                 }]);
@@ -267,6 +267,28 @@ jobs:
             }"""
           human = once(human, anchor, addition, "insert integrated intimate mesh")
           write("src/core/human.ts", human)
+
+          # Improve the existing skin shader and mobile render budget; no new assets/packages.
+          viewer = read("src/app/viewer.ts")
+          viewer = once(viewer, "this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));",
+              "this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia('(max-width: 760px)').matches ? 1.5 : 2));",
+              "mobile render budget")
+          pattern = re.compile(r"(?m)^(?P<indent>[ \\t]*)const mat = new THREE\\.MeshStandardMaterial\\(\\{\\n(?P<body>(?:[ \\t]+.*\\n)*?)(?P=indent)\\}\\);")
+          matches = list(pattern.finditer(viewer))
+          if len(matches) != 1:
+              raise SystemExit("Patch stopped: expected one skin material block, found " + str(len(matches)))
+          m = matches[0]
+          indent, body = m.group("indent"), m.group("body")
+          new_block = (
+              indent + "const materialOptions: THREE.MeshStandardMaterialParameters = {\\n"
+              + body
+              + indent + "};\\n"
+              + indent + "const mat = mt.name === 'Skin'\\n"
+              + indent + "  ? new THREE.MeshPhysicalMaterial({ ...materialOptions, sheen: 0.12, sheenRoughness: 0.86, clearcoat: 0.02, clearcoatRoughness: 0.7, specularIntensity: 0.55 })\\n"
+              + indent + "  : new THREE.MeshStandardMaterial(materialOptions);"
+          )
+          viewer = viewer[:m.start()] + new_block + viewer[m.end():]
+          write("src/app/viewer.ts", viewer)
 
           # 3) Control panel: the original app layout stays intact; controls update real mesh parameters.
           main = read("src/app/main.ts")

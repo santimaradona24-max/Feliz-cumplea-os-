@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: avatar-lab-build
+  group: avatar-lab-bundled-assets
   cancel-in-progress: false
 
 jobs:
@@ -301,8 +301,12 @@ jobs:
       - name: Install existing dependencies, build and test
         run: |
           cd "$RUNNER_TEMP/ara"
+          # Reuse the already-published catalog, body/target packs, proxies and textures.
+          # Only the engine source changes; no MakeHuman/asset-pack re-download is needed.
+          mkdir -p "$RUNNER_TEMP/ara/public/assets"
+          cp -a "$GITHUB_WORKSPACE/avatar-lab/assets/." "$RUNNER_TEMP/ara/public/assets/"
+          find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f \\( -name '*.js' -o -name '*.css' -o -name '*.map' \\) -delete
           npm install --no-audit --no-fund
-          npm run setup-assets
           BASE_PATH=/Feliz-cumplea-os-/avatar-lab/ npm run build
           npm test
 

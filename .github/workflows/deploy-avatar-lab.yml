@@ -32,7 +32,7 @@ jobs:
         run: |
           export ARA_DIR="$RUNNER_TEMP/ara"
           python3 - <<'PY'
-          import json, os, textwrap
+          import json, os, textwrap, re
           from pathlib import Path
 
           root = Path(os.environ["ARA_DIR"])
@@ -331,36 +331,22 @@ jobs:
           viewer = once(viewer, "this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));",
               "this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia('(max-width: 760px)').matches ? 1.5 : 2));",
               "mobile pixel budget")
-          old_mat = textwrap.dedent("""\
-          const mat = new THREE.MeshStandardMaterial({
-            name: mt.name,
-            color: new THREE.Color(mt.color),
-            roughness: mt.roughness,
-            metalness: mt.metalness,
-            map: mt.map ? this.texture(mt.map, true) : null,
-            normalMap: mt.normalMap ? this.texture(mt.normalMap, false) : null,
-            side: mt.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
-            emissive: mt.emissive ? new THREE.Color(mt.emissive) : new THREE.Color(0),
-            emissiveIntensity: mt.emissive ? 1.6 : 0,
-            wireframe: this.wireframe,
-          });""")
-          new_mat = textwrap.dedent("""\
-          const materialOptions: THREE.MeshStandardMaterialParameters = {
-            name: mt.name,
-            color: new THREE.Color(mt.color),
-            roughness: mt.roughness,
-            metalness: mt.metalness,
-            map: mt.map ? this.texture(mt.map, true) : null,
-            normalMap: mt.normalMap ? this.texture(mt.normalMap, false) : null,
-            side: mt.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
-            emissive: mt.emissive ? new THREE.Color(mt.emissive) : new THREE.Color(0),
-            emissiveIntensity: mt.emissive ? 1.6 : 0,
-            wireframe: this.wireframe,
-          };
-          const mat = mt.name === 'Skin'
-            ? new THREE.MeshPhysicalMaterial({ ...materialOptions, sheen:0.12, sheenRoughness:0.86, clearcoat:0.02, clearcoatRoughness:0.7, specularIntensity:0.55 })
-            : new THREE.MeshStandardMaterial(materialOptions);""")
-          viewer = once(viewer, old_mat, new_mat, "PBR skin material")
+          # Find the renderer's material constructor irrespective of its indentation.
+          pattern = re.compile(r"(?m)^(?P<indent>[ \t]*)const mat = new THREE\.MeshStandardMaterial\(\{\n(?P<body>(?:[ \t]+.*\n)*?)(?P=indent)\}\);")
+          matches = list(pattern.finditer(viewer))
+          if len(matches) != 1:
+              raise SystemExit("Patch stopped: expected one skin material block, found " + str(len(matches)))
+          m = matches[0]
+          indent, body = m.group("indent"), m.group("body")
+          new_block = (
+              indent + "const materialOptions: THREE.MeshStandardMaterialParameters = {\n"
+              + body
+              + indent + "};\n"
+              + indent + "const mat = mt.name === 'Skin'\n"
+              + indent + "  ? new THREE.MeshPhysicalMaterial({ ...materialOptions, sheen: 0.12, sheenRoughness: 0.86, clearcoat: 0.02, clearcoatRoughness: 0.7, specularIntensity: 0.55 })\n"
+              + indent + "  : new THREE.MeshStandardMaterial(materialOptions);"
+          )
+          viewer = viewer[:m.start()] + new_block + viewer[m.end():]
           write("src/app/viewer.ts", viewer)
 
           pkg_path = root / "package.json"

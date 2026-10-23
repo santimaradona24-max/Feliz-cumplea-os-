@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: avatar-lab-bundled-assets
+  group: avatar-lab-bundled-assets-v2
   cancel-in-progress: false
 
 jobs:
@@ -305,7 +305,9 @@ jobs:
           # Only the engine source changes; no MakeHuman/asset-pack re-download is needed.
           mkdir -p "$RUNNER_TEMP/ara/public/assets"
           cp -a "$GITHUB_WORKSPACE/avatar-lab/assets/." "$RUNNER_TEMP/ara/public/assets/"
-          find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f \\( -name '*.js' -o -name '*.css' -o -name '*.map' \\) -delete
+          find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f -name '*.js' -delete
+          find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f -name '*.css' -delete
+          find "$RUNNER_TEMP/ara/public/assets" -maxdepth 1 -type f -name '*.map' -delete
           npm install --no-audit --no-fund
           BASE_PATH=/Feliz-cumplea-os-/avatar-lab/ npm run build
           npm test

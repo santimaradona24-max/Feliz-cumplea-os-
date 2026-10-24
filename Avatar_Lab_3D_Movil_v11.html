@@ -650,7 +650,7 @@ document.querySelector('#random').addEventListener('click',async()=>{
 });
 document.querySelector('#reset').addEventListener('click',async()=>{Object.assign(state,startState);motionSpeed=1;motionPaused=false;renderPanel();updateHud();applyModel();if(ready){try{await setHair(state.hair);if(clothing)await clothing.setOutfit(['tshirt','jeans','shoes']);playMotion('idle_breathe')}catch(e){console.warn(e)}}toast('Apariencia reiniciada')});
 document.querySelector('#enter').addEventListener('click',()=>{
- const payload={format:'avatar-lab-character-v9',savedAt:new Date().toISOString(),character:{...state},clothing:clothing?.worn?.()||[],hair:state.hair,ageMorph:ageToMorph(state.age),note:'Prototype save; no game world is connected yet.'};
+ const payload={format:'avatar-lab-character-v11',savedAt:new Date().toISOString(),character:{...state},clothing:clothing?.worn?.()||[],hair:state.hair,ageMorph:ageToMorph(state.age),note:'Prototype save; no game world is connected yet.'};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(String(state.name||'personaje').trim().toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'')||'personaje')+'.avatar.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Personaje guardado como archivo JSON');
 });
 renderPanel();updateHud();

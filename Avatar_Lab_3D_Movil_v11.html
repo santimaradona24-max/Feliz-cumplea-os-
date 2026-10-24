@@ -244,12 +244,12 @@ const MALE_PROXY_ASSETS={
  erect:{obj:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.obj',map:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.proxy'}
 };
 function parseMaleProxyMap(source){
- const lines=source.split(/\\r?\\n/),start=lines.findIndex(x=>x.trim()==='verts 0');
+ const lines=source.split(/\r?\n/),start=lines.findIndex(x=>x.trim()==='verts 0');
  if(start<0)throw new Error('El proxy masculino no contiene la tabla verts 0');
  const rows=[];
  for(const raw of lines.slice(start+1)){
   const line=raw.trim();if(!line||line.startsWith('#'))continue;
-  const n=line.split(/\\s+/).map(Number);if(n.some(x=>!Number.isFinite(x)))break;
+  const n=line.split(/\s+/).map(Number);if(n.some(x=>!Number.isFinite(x)))break;
   if(n.length===1)rows.push({kind:'direct',index:n[0]});
   else if(n.length===9)rows.push({kind:'triangle',ids:n.slice(0,3),weights:n.slice(3,6),offset:n.slice(6,9)});
   else throw new Error('Fila proxy no reconocida ('+n.length+' valores)');
@@ -259,9 +259,9 @@ function parseMaleProxyMap(source){
 function parseMaleProxyObj(source){
  const positions=[],uvs=[],faces=[];
  const idx=(v,n)=>{const x=parseInt(v,10);return x<0?n+x:x-1};
- for(const raw of source.split(/\\r?\\n/)){
+ for(const raw of source.split(/\r?\n/)){
   const line=raw.trim();if(!line||line[0]==='#')continue;
-  const a=line.split(/\\s+/),kind=a[0];
+  const a=line.split(/\s+/),kind=a[0];
   if(kind==='v'&&a.length>=4)positions.push([Number(a[1]),Number(a[2]),Number(a[3])]);
   else if(kind==='vt'&&a.length>=3)uvs.push([Number(a[1]),1-Number(a[2])]);
   else if(kind==='f'&&a.length>=4){
@@ -275,9 +275,9 @@ function parseMaleProxyObj(source){
 function parseMaleProxyScale(source){
  const out={};
  for(const key of ['x_scale','y_scale','z_scale']){
-  const line=source.split(/\\r?\\n/).find(x=>x.trim().startsWith(key+' '));
+  const line=source.split(/\r?\n/).find(x=>x.trim().startsWith(key+' '));
   if(!line)throw new Error('Falta la referencia '+key);
-  const n=line.trim().split(/\\s+/).slice(1).map(Number);
+  const n=line.trim().split(/\s+/).slice(1).map(Number);
   if(n.length<3||n.some(x=>!Number.isFinite(x)))throw new Error('Referencia inválida '+key);
   out[key]={a:n[0],b:n[1],declared:n[2]};
  }

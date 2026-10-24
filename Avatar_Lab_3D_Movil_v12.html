@@ -158,7 +158,7 @@ const panel=$('#panel');
 const state={name:'El Viajero',sex:'male',age:25,height:172,weight:0,muscle:0,proportions:0,skin:'#c99a80',hairColor:'#3b2a1e',browColor:'#3b2a1e',eyeColor:'#4a2f19',hair:'short02',noseWidth:0,noseLength:0,noseHeight:0,jawWidth:0,chin:0,cheekbones:0,eyeSize:0,eyeSpacing:0,eyeTilt:0,lips:0,mouthWidth:0,earSize:0,forehead:0,browThickness:0,browHeight:0,browAngle:0,browSpacing:0,beard:false,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeGluteWidth:0,shapeGluteProjection:0,shapeAbdomen:0,shapeCalves:0,naturalGray:true,breastSize:.35,breastFirmness:.45,breastHeight:0,breastSpacing:0,breastProjection:0,genitalType:'auto',genitalState:'flaccid',genitalSize:1,genitalShape:0,genitalOffset:0,genitalSkin:'#c99a80',genitalDetailColor:'#b47a78',showAnatomy:true,pubicHair:true,pubicHairAmount:.55,pubicHairLength:1,pubicHairColor:'#3b2a1e',selectedClothId:'tshirt',bodyPreset:'balanced'};
 const startState={...state};
 let currentTab='body',engine=null,THREE=null,scene=null,camera=null,renderer=null,controls=null,loader=null,modelRoot=null,body=null,joints=null,parts=[],clothing=null,clothingCatalog=null,hairCatalog=null,hairCache=new Map(),currentHair=null,ready=false,toastTimer=0;
-let maleProxyMeshes={},maleProxyReady=false,maleProxyFitSignature='';
+let anatomyMeshes=[],anatomySignature='',anatomySkinTexture=null;
 let mixer=null, motionClips=[], activeMotion='idle_breathe', currentAction=null, motionSpeed=1, motionPaused=false, frameClock=null, eyeLife=null, applyEyeMorphWeights=null, idleElapsed=0, idleNext=8+Math.random()*6, missingAgeMorphs=[];
 const SHAPE_KEYS=['shapeShoulders','shapeChest','shapeWaist','shapeHips','shapeArms','shapeLegs','shapeGlutes','shapeGluteWidth','shapeGluteProjection','shapeAbdomen','shapeCalves'];
 const shapeMorphParts=new WeakSet();
@@ -231,252 +231,180 @@ function addPhysicalShapeMorphs(mesh){
 function applyShapeMorphs(mesh){if(!mesh?.morphTargetDictionary||!mesh.morphTargetInfluences)return;for(const k of SHAPE_KEYS){const i=mesh.morphTargetDictionary[k];if(i!==undefined)mesh.morphTargetInfluences[i]=state[k]||0}}
 
 // V9: procedural anatomy and texture generated inside this HTML; no additional model download.
+function makeAnatomyBuilder(){return {positions:[],uvs:[],indices:[]}}
+function addAnatomyVertex(b,x,y,z,u=0,v=0){const i=b.positions.length/3;b.positions.push(x,y,z);b.uvs.push(u,v);return i}
+function addAnatomyEllipsoid(b,c,r,segments=28,rings=18,rotX=0){
+ const start=b.positions.length/3,cs=Math.cos(rotX),sn=Math.sin(rotX);
+ for(let j=0;j<=rings;j++){
+  const v=j/rings,phi=v*Math.PI,sp=Math.sin(phi),cp=Math.cos(phi);
+  for(let i=0;i<=segments;i++){
+   const u=i/segments,theta=u*Math.PI*2,lx=r[0]*sp*Math.cos(theta),ly=r[1]*cp,lz=r[2]*sp*Math.sin(theta);
+   const y=ly*cs-lz*sn,z=ly*sn+lz*cs;
+   addAnatomyVertex(b,c[0]+lx,c[1]+y,c[2]+z,u,1-v);
+  }
+ }
+ const row=segments+1;
+ for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){
+  const a=start+j*row+i,bb=a+1,d=a+row,c=d+1;
+  b.indices.push(a,bb,c,a,c,d);
+ }
+}
+// A continuous, gently tapered shaft. The axis changes by state: downward/forward
+// when flaccid; longer and slightly raised when erect. The end is finished by a
+// separate oriented glans mesh, not by a floating sphere on a straight cylinder.
+function addAnatomyTube(b,start,length,rx,ry,shape,erect=false){
+ const around=28,steps=22,base=b.positions.length/3;
+ const angle=erect?1.05:-.72,dy=Math.sin(angle),dz=Math.cos(angle);
+ for(let j=0;j<=steps;j++){
+  const t=j/steps;
+  const smoothStart=.86+.14*Math.min(1,t*7),bulb=1+.10*Math.exp(-Math.pow((t-.82)/.13,2));
+  const profile=smoothStart*bulb*(1-.12*t),bend=shape*.009*Math.sin(Math.PI*t);
+  const cx=start[0]+bend,cy=start[1]+dy*length*t+shape*.004*Math.sin(Math.PI*t),cz=start[2]+dz*length*t;
+  for(let i=0;i<=around;i++){
+   const u=i/around,a=u*Math.PI*2,x=Math.cos(a)*rx*profile,y=Math.sin(a)*ry*profile;
+   addAnatomyVertex(b,cx+x,cy+y*dz,cz-y*dy,u,t);
+  }
+ }
+ const row=around+1;
+ for(let j=0;j<steps;j++)for(let i=0;i<around;i++){
+  const a=base+j*row+i,bb=a+1,d=a+row,c=d+1;
+  b.indices.push(a,d,c,a,c,bb);
+ }
+ return {angle,dy,dz,end:[start[0]+shape*.001,start[1]+dy*length,start[2]+dz*length]};
+}
 
-/*
- * Male-only body proxy sources. Both assets follow MakeHuman's HM08 body topology.
- * Flaccid: adult_male_genitalia proxy, AGPL-3.0; original source/model is fetched from its repository.
- * Erect: Male_Gen-Heal1 proxy, CC0.
- * Asset source: https://github.com/rossmrobinson/proto-game/tree/9088314b5fe5f788c25a2aa3b42f99dee00e62f5/single-room/assets/mh-assets/proxies
- */
-const MALE_PROXY_ROOT='https://cdn.jsdelivr.net/gh/rossmrobinson/proto-game@9088314b5fe5f788c25a2aa3b42f99dee00e62f5/single-room/assets/mh-assets/proxies/';
-const MALE_PROXY_ASSETS={
- // Only the CC0 proxy whose vertex mapping matches this lab's 13,380-vertex body.
- // The older flaccid proxy uses a different HM08 topology and must not be fitted to this mesh.
- male:{obj:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.obj',map:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.proxy'}
-};
-function parseMaleProxyMap(source){
- const lines=source.split(/\r?\n/),start=lines.findIndex(x=>x.trim()==='verts 0');
- if(start<0)throw new Error('El proxy masculino no contiene la tabla verts 0');
- const rows=[];
- for(const raw of lines.slice(start+1)){
-  const line=raw.trim();if(!line||line.startsWith('#'))continue;
-  const n=line.split(/\s+/).map(Number);if(n.some(x=>!Number.isFinite(x)))break;
-  if(n.length===1)rows.push({kind:'direct',index:n[0]});
-  else if(n.length===9)rows.push({kind:'triangle',ids:n.slice(0,3),weights:n.slice(3,6),offset:n.slice(6,9)});
-  else throw new Error('Fila proxy no reconocida ('+n.length+' valores)');
+function anatomyTexture(){
+ if(anatomySkinTexture||!engine?.THREE)return anatomySkinTexture;
+ const T=engine.THREE,canvas=document.createElement('canvas');canvas.width=canvas.height=512;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return null;
+ // Soft warm undertone with broad mottling and fine grain, generated locally.
+ const grad=ctx.createRadialGradient(250,240,16,256,256,330);
+ grad.addColorStop(0,'#fffaf7');grad.addColorStop(.55,'#f3e3df');grad.addColorStop(1,'#dfc8c4');ctx.fillStyle=grad;ctx.fillRect(0,0,512,512);
+ let seed=81723;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+ const img=ctx.getImageData(0,0,512,512);
+ for(let y=0;y<512;y++)for(let x=0;x<512;x++){
+  const i=(y*512+x)*4,n=(rand()-.5)*18,cloud=(Math.sin(x*.021+Math.sin(y*.013)*2)+Math.sin(y*.017+x*.009)) * 2.2;
+  img.data[i]=Math.max(0,Math.min(255,img.data[i]+n+cloud));
+  img.data[i+1]=Math.max(0,Math.min(255,img.data[i+1]+n*.68+cloud*.6));
+  img.data[i+2]=Math.max(0,Math.min(255,img.data[i+2]+n*.62+cloud*.4));
  }
- return rows;
+ ctx.putImageData(img,0,0);
+ for(let i=0;i<1150;i++){
+  const x=rand()*512,y=rand()*512,r=.25+rand()*1.25,a=.018+rand()*.055;
+  ctx.fillStyle=rand()>.55?`rgba(119,65,57,${a})`:`rgba(255,248,240,${a})`;
+  ctx.beginPath();ctx.ellipse(x,y,r,r*(.45+rand()),rand()*Math.PI,0,Math.PI*2);ctx.fill();
+ }
+ for(let i=0;i<14;i++){
+  const x=rand()*512,y=rand()*512,w=8+rand()*26,h=.6+rand()*1.1;
+  ctx.strokeStyle=`rgba(130,75,68,${.035+rand()*.04})`;ctx.lineWidth=h;ctx.beginPath();ctx.moveTo(x,y);ctx.bezierCurveTo(x+w*.3,y-2,x+w*.65,y+2,x+w,y+(rand()-.5)*3);ctx.stroke();
+ }
+ anatomySkinTexture=new T.CanvasTexture(canvas);anatomySkinTexture.colorSpace=T.SRGBColorSpace;anatomySkinTexture.wrapS=T.RepeatWrapping;anatomySkinTexture.wrapT=T.RepeatWrapping;anatomySkinTexture.anisotropy=Math.min(4,renderer?.capabilities?.getMaxAnisotropy?.()||1);anatomySkinTexture.needsUpdate=true;return anatomySkinTexture;
 }
-function parseMaleProxyObj(source){
- const positions=[],uvs=[],faces=[];
- const idx=(v,n)=>{const x=parseInt(v,10);return x<0?n+x:x-1};
- for(const raw of source.split(/\r?\n/)){
-  const line=raw.trim();if(!line||line[0]==='#')continue;
-  const a=line.split(/\s+/),kind=a[0];
-  if(kind==='v'&&a.length>=4)positions.push([Number(a[1]),Number(a[2]),Number(a[3])]);
-  else if(kind==='vt'&&a.length>=3)uvs.push([Number(a[1]),1-Number(a[2])]);
-  else if(kind==='f'&&a.length>=4){
-   const corners=a.slice(1).map(token=>{const p=token.split('/');return {p:idx(p[0],positions.length),t:p[1]?idx(p[1],uvs.length):-1}});
-   for(let i=1;i<corners.length-1;i++)faces.push([corners[0],corners[i],corners[i+1]]);
-  }
- }
- if(!positions.length||!uvs.length||!faces.length)throw new Error('El OBJ masculino no contiene posiciones, UV y caras');
- return {positions,uvs,faces};
-}
-function parseMaleProxyScale(source){
- const out={};
- for(const key of ['x_scale','y_scale','z_scale']){
-  const line=source.split(/\r?\n/).find(x=>x.trim().startsWith(key+' '));
-  if(!line)throw new Error('Falta la referencia '+key);
-  const n=line.trim().split(/\s+/).slice(1).map(Number);
-  if(n.length<3||n.some(x=>!Number.isFinite(x)))throw new Error('Referencia inválida '+key);
-  out[key]={a:n[0],b:n[1],declared:n[2]};
- }
- return out;
-}
-function makeMaleProxyGeometry(info){
- const T=engine.THREE,pairs=[],indices=[],pairMap=new Map(),triRows=[];
- const resolve=c=>{
-  const key=c.p+'/'+c.t;
-  let i=pairMap.get(key);
-  if(i===undefined){i=pairs.length;pairMap.set(key,i);pairs.push({mapIndex:c.p,uvIndex:c.t});}
-  return i;
- };
- for(const tri of info.obj.faces){
-  // This proxy is a full replacement body mesh. In the lab we keep the original body
-  // visible and render only the new/interpolated genital patch to avoid replacing it
-  // with a second whole-body mesh or hiding the original body surface.
-  if(!tri.some(c=>info.rows[c.p]?.kind==='triangle'))continue;
-  const outTri=tri.map(resolve);indices.push(outTri[0],outTri[1],outTri[2]);
-  triRows.push([tri[0].p,tri[1].p,tri[2].p]);
- }
- const geo=new T.BufferGeometry(),p=new Float32Array(pairs.length*3),uv=new Float32Array(pairs.length*2);
- for(let i=0;i<pairs.length;i++){
-  const pair=pairs[i],tex=pair.uvIndex>=0?info.obj.uvs[pair.uvIndex]:[0,0];
-  uv[i*2]=tex[0];uv[i*2+1]=tex[1];
- }
- geo.setAttribute('position',new T.BufferAttribute(p,3));
- geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
- geo.setIndex(indices);
- geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(p.length),3));
- const skinIndex=new Uint16Array(pairs.length*4),skinWeight=new Float32Array(pairs.length*4);
- const bsi=body.geometry.attributes.skinIndex?.array,bsw=body.geometry.attributes.skinWeight?.array;
- const bodyN=body.geometry.attributes.position.count;
- const pelvisIndex=Math.max(0,body.skeleton.bones.findIndex(b=>/^(hips|pelvis)$/i.test(b.name)));
- const mappedInfluence=(row)=>{
-  if(row.kind==='direct'&&row.index>=0&&row.index<bodyN&&bsi&&bsw)return Array.from({length:4},(_,k)=>[bsi[row.index*4+k],bsw[row.index*4+k]]);
-  if(row.kind==='triangle'&&row.ids.every(i=>i>=0&&i<bodyN)&&bsi&&bsw){
-   const accum=new Map();
-   for(let k=0;k<3;k++)for(let j=0;j<4;j++){
-    const bone=bsi[row.ids[k]*4+j],weight=Math.max(0,row.weights[k])*bsw[row.ids[k]*4+j];
-    if(weight>1e-6)accum.set(bone,(accum.get(bone)||0)+weight);
-   }
-   const top=[...accum.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4),sum=top.reduce((v,x)=>v+x[1],0);
-   if(sum>1e-8)return top.map(x=>[x[0],x[1]/sum]);
-  }
-  return [[pelvisIndex,1]];
- };
- for(let i=0;i<pairs.length;i++){
-  const row=info.rows[pairs[i].mapIndex],w=mappedInfluence(row);
-  for(let k=0;k<Math.min(4,w.length);k++){skinIndex[i*4+k]=w[k][0];skinWeight[i*4+k]=w[k][1];}
-  const sum=skinWeight[i*4]+skinWeight[i*4+1]+skinWeight[i*4+2]+skinWeight[i*4+3];
-  if(sum<1e-8){skinIndex[i*4]=pelvisIndex;skinWeight[i*4]=1;}
- }
- geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(skinIndex,4));
- geo.setAttribute('skinWeight',new T.Float32BufferAttribute(skinWeight,4));
- info.pairs=pairs;info.triRows=triRows;info.geometry=geo;
- return geo;
-}
-function maleProxyBodyPositions(info){
- const T=engine.THREE,bodyN=body.geometry.attributes.position.count;
- const current=new Float32Array(bodyN*3),tmp=new T.Vector3();
- for(let i=0;i<bodyN;i++){
-  T.Mesh.prototype.getVertexPosition.call(body,i,tmp);
-  current[i*3]=tmp.x;current[i*3+1]=tmp.y;current[i*3+2]=tmp.z;
- }
- const scaleFor=(arr,ref,axis)=>Math.abs(arr[ref.a*3+axis]-arr[ref.b*3+axis]);
- // MakeHuman's transform matrix is diagonal: (xScale, yScale, zScale) in the
- // same Y-up coordinate convention as this exported proxy.
- const s1=[scaleFor(current,info.refs.x_scale,0),scaleFor(current,info.refs.y_scale,1),scaleFor(current,info.refs.z_scale,2)];
- const den=[info.refs.x_scale.declared,info.refs.y_scale.declared,info.refs.z_scale.declared];
- const ratio=s1.map((v,i)=>v/Math.max(1e-7,den[i]));
- const fit=new Float32Array(info.rows.length*3),raw=info.obj.positions;
- let sourceFallbacks=0;
- for(let i=0;i<info.rows.length;i++){
-  const row=info.rows[i],o=i*3;
-  if(row.kind==='direct'&&row.index>=0&&row.index<bodyN){
-   const j=row.index*3;fit[o]=current[j];fit[o+1]=current[j+1];fit[o+2]=current[j+2];
-  }else if(row.kind==='triangle'&&row.ids.every(j=>j>=0&&j<bodyN)){
-   for(let axis=0;axis<3;axis++)fit[o+axis]=row.weights[0]*current[row.ids[0]*3+axis]+row.weights[1]*current[row.ids[1]*3+axis]+row.weights[2]*current[row.ids[2]*3+axis]+row.offset[axis]*ratio[axis];
-  }else{
-   fit[o]=raw[i][0];fit[o+1]=raw[i][1];fit[o+2]=raw[i][2];sourceFallbacks++;
-  }
- }
- // The compatible source mesh provides an erect anatomy patch. For the flaccid state,
- // bend and shorten only vertices added by the proxy, never the underlying body mesh.
- if(info.mode==='flaccid'){
-  const smooth=(v,a,b)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)};
-  body.updateWorldMatrix(true,false);
-  const hip=body.skeleton.bones.find(x=>/^(hips|pelvis)$/i.test(x.name));
-  const root=hip?body.worldToLocal(hip.getWorldPosition(new T.Vector3())):new T.Vector3(0,.84,0);
-  const rootX=root.x,rootY=root.y-.012,rootZ=root.z+.095;
-  const angle=1.06,cs=Math.cos(angle),sn=Math.sin(angle),lengthScale=.58;
-  for(let i=0;i<info.rows.length;i++){
-   if(info.rows[i].kind!=='triangle')continue;
-   const src=raw[i],weight=smooth(src[2],.105,.175)*smooth(src[1],.785,.835);
-   if(weight<.001)continue;
-   const o=i*3,dx=fit[o]-rootX,dy=fit[o+1]-rootY,dz=fit[o+2]-rootZ;
-   const fy=rootY+(dy*cs-dz*sn)*lengthScale;
-   const fz=rootZ+(dy*sn+dz*cs)*lengthScale;
-   fit[o+1]+=(fy-fit[o+1])*weight;fit[o+2]+=(fz-fit[o+2])*weight;
-  }
- }
- info.sourceFallbacks=sourceFallbacks;
- return fit;
-}
-function updateMaleProxyGeometry(mesh,force=false){
- if(!mesh||!body||!engine)return;
- const info=mesh.userData.maleProxyInfo;
- const fitSig=JSON.stringify([Object.values(engine.values||{}),SHAPE_KEYS.map(k=>state[k])]);
- if(!force&&info.fitSig===fitSig)return;
- const fit=maleProxyBodyPositions(info);
- const geo=info.geometry,pos=geo.attributes.position.array,normals=new Float32Array(info.rows.length*3),pairs=info.pairs;
- for(let i=0;i<pairs.length;i++){
-  const src=pairs[i].mapIndex,o=i*3,p=src*3;
-  pos[o]=fit[p];pos[o+1]=fit[p+1];pos[o+2]=fit[p+2];
- }
- // Smooth across UV seams by accumulating normals on the shared OBJ position indices first.
- for(const tri of info.triRows){
-  const a=fit.subarray(tri[0]*3,tri[0]*3+3),b=fit.subarray(tri[1]*3,tri[1]*3+3),c=fit.subarray(tri[2]*3,tri[2]*3+3);
-  const abx=b[0]-a[0],aby=b[1]-a[1],abz=b[2]-a[2],acx=c[0]-a[0],acy=c[1]-a[1],acz=c[2]-a[2];
-  const nx=aby*acz-abz*acy,ny=abz*acx-abx*acz,nz=abx*acy-aby*acx;
-  for(const v of tri){const o=v*3;normals[o]+=nx;normals[o+1]+=ny;normals[o+2]+=nz;}
- }
- for(let i=0;i<pairs.length;i++){
-  const src=pairs[i].mapIndex,a=src*3,o=i*3,len=Math.hypot(normals[a],normals[a+1],normals[a+2])||1;
-  geo.attributes.normal.array[o]=normals[a]/len;geo.attributes.normal.array[o+1]=normals[a+1]/len;geo.attributes.normal.array[o+2]=normals[a+2]/len;
- }
- geo.attributes.position.needsUpdate=true;geo.attributes.normal.needsUpdate=true;geo.computeBoundingSphere();geo.computeBoundingBox();
- info.fitSig=fitSig;
-}
-async function loadMaleProxy(stateName){
- const T=engine.THREE,asset=MALE_PROXY_ASSETS.male;
- const [objRes,mapRes]=await Promise.all([fetch(asset.obj,{cache:'force-cache'}),fetch(asset.map,{cache:'force-cache'})]);
- if(!objRes.ok||!mapRes.ok)throw new Error('No se pudo descargar la malla masculina ('+stateName+')');
- const [objText,mapText]=await Promise.all([objRes.text(),mapRes.text()]);
- const rows=parseMaleProxyMap(mapText),obj=parseMaleProxyObj(objText);
- if(rows.length!==obj.positions.length)throw new Error('No coinciden vértices OBJ/proxy: '+obj.positions.length+'/'+rows.length);
- const info={rows,obj,refs:parseMaleProxyScale(mapText),fitSig:'',mode:stateName};
- const geometry=makeMaleProxyGeometry(info);
- const skinMat=[].concat(body.material||[]).find(m=>m&&engine.materialRole(m.name)==='skin')||[].concat(body.material||[])[0];
- const material=skinMat?.clone?.()||new T.MeshStandardMaterial({color:state.skin,roughness:.72,side:T.DoubleSide});
- material.side=T.DoubleSide;material.polygonOffset=true;material.polygonOffsetFactor=-1;material.polygonOffsetUnits=-1;
- const mesh=new T.SkinnedMesh(geometry,material);
- mesh.name=stateName==='flaccid'?'MaleAnatomy_FlaccidPatch':'MaleAnatomy_ErectPatch';
- mesh.position.copy(body.position);mesh.quaternion.copy(body.quaternion);mesh.scale.copy(body.scale);
- mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=2;
- (body.parent||modelRoot).add(mesh);mesh.bind(body.skeleton,body.bindMatrix);
- mesh.userData.maleProxyInfo=info;
- updateMaleProxyGeometry(mesh,true);
- return mesh;
-}
-async function initMaleProxyMeshes(){
- if(maleProxyReady||!body||!engine)return;
- status('CARGANDO MALLA ANATÓMICA MASCULINA…');
- try{
-  const erect=await loadMaleProxy('erect');
-  const T=engine.THREE,baseInfo=erect.userData.maleProxyInfo;
-  baseInfo.mode='erect';baseInfo.fitSig='';
-  const flaccidGeometry=erect.geometry.clone();
-  const flaccid=new T.SkinnedMesh(flaccidGeometry,erect.material);
-  flaccid.name='MaleAnatomy_FlaccidPatch';
-  flaccid.position.copy(body.position);flaccid.quaternion.copy(body.quaternion);flaccid.scale.copy(body.scale);
-  flaccid.frustumCulled=false;flaccid.castShadow=true;flaccid.receiveShadow=true;flaccid.renderOrder=2;
-  (body.parent||modelRoot).add(flaccid);flaccid.bind(body.skeleton,body.bindMatrix);
-  flaccid.userData.maleProxyInfo={...baseInfo,geometry:flaccidGeometry,fitSig:'',mode:'flaccid'};
-  maleProxyMeshes={flaccid,erect};maleProxyReady=true;
-  updateMaleProxyGeometry(flaccid,true);updateMaleProxyGeometry(erect,true);
-  console.info('[Avatar Lab V12] Compatible male anatomy patch loaded',{
-   source:'MakeHuman CC0 Male_Gen-Heal1',bodyVertices:body.geometry.attributes.position.count,
-   proxyRows:baseInfo.rows.length,addedVertices:baseInfo.rows.filter(x=>x.kind==='triangle').length,
-   renderedPatchVertices:erect.geometry.attributes.position.count,sourceFallbacks:baseInfo.sourceFallbacks
-  });
- }catch(e){
-  for(const mesh of Object.values(maleProxyMeshes)){mesh.removeFromParent();mesh.geometry?.dispose();}
-  maleProxyMeshes={};maleProxyReady=false;body.visible=true;
-  console.warn('[Avatar Lab V12] No se pudo cargar la malla masculina; se mantiene el cuerpo base.',e);
- }
-}
+
 function anatomyCoveringBottom(){
  const worn=clothing?.worn?.()||[],items=clothingCatalog?.items||[];
  const blockedIds=new Set(['jeans','shorts','skirt','dress','briefs','panties','trenchcoat']);
  return worn.some(id=>{const it=items.find(x=>x.id===id);return blockedIds.has(id)||['bottom','underwear','dress'].includes(String(it?.slot||'').toLowerCase())});
 }
+function makeAnatomySkinnedMesh(builder,material,name){
+ if(!builder.indices.length)return null;
+ const T=engine.THREE,geo=new T.BufferGeometry(),positions=Float32Array.from(builder.positions),count=positions.length/3;
+ geo.setAttribute('position',new T.BufferAttribute(positions,3));geo.setAttribute('uv',new T.Float32BufferAttribute(builder.uvs,2));geo.setIndex(builder.indices);geo.computeVertexNormals();
+ const hipsIndex=Math.max(0,body.skeleton.bones.findIndex(b=>/^(hips|pelvis)$/i.test(b.name)));
+ const ji=new Uint16Array(count*4),jw=new Float32Array(count*4);
+ for(let i=0;i<count;i++){ji[i*4]=hipsIndex;jw[i*4]=1;}
+ geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(ji,4));geo.setAttribute('skinWeight',new T.Float32BufferAttribute(jw,4));
+ const mesh=new T.SkinnedMesh(geo,material);mesh.name=name;mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=3;
+ mesh.position.copy(body.position);mesh.quaternion.copy(body.quaternion);mesh.scale.copy(body.scale);
+ (body.parent||modelRoot).add(mesh);mesh.bind(body.skeleton,body.bindMatrix);return mesh;
+}
+function buildAnatomyMeshes(){
+ const T=engine.THREE,skin=makeAnatomyBuilder(),detail=makeAnatomyBuilder(),hair=makeAnatomyBuilder();
+ const pos=body.geometry.attributes.position.array;
+ modelRoot.updateMatrixWorld(true);body.updateWorldMatrix(true,false);
+ const localBone=(re)=>{const b=body.skeleton.bones.find(x=>re.test(x.name));if(!b)return null;const q=b.getWorldPosition(new T.Vector3());return body.worldToLocal(q)};
+ const hips=localBone(/^(hips|pelvis)$/i),left=localBone(/^leftupleg$/i)||localBone(/^upperleg.*\.L$/i),right=localBone(/^rightupleg$/i)||localBone(/^upperleg.*\.R$/i);
+ const cx=left&&right?(left.x+right.x)/2:(hips?.x||0),hy=hips?.y??.86;
+ const size=Math.max(.65,Math.min(1.5,Number(state.genitalSize)||1)),shape=Math.max(-1,Math.min(1,Number(state.genitalShape)||0));
+ const cy=(left&&right?((left.y+right.y)/2-.025):hy-.155)+(state.shapeHips||0)*.006+(state.shapeLegs||0)*.003;
+ // Find the front surface near each anatomical region instead of using one
+ // torso-wide maximum. This prevents the added meshes hovering in front of the pelvis.
+ const estimateFront=(targetY,rx,ry,fallback)=>{
+  const zs=[];
+  for(let i=0;i<pos.length;i+=3)if(Math.abs(pos[i]-cx)<rx&&Math.abs(pos[i+1]-targetY)<ry)zs.push(pos[i+2]);
+  if(zs.length<4)return fallback;
+  zs.sort((a,b)=>a-b);return zs[Math.max(0,Math.floor((zs.length-1)*.9))];
+ };
+ let frontSeed=-Infinity;
+ for(let i=0;i<pos.length;i+=3)if(Math.abs(pos[i]-cx)<.07&&Math.abs(pos[i+1]-(cy+.012))<.045)frontSeed=Math.max(frontSeed,pos[i+2]);
+ if(!Number.isFinite(frontSeed))frontSeed=.06;
+ const frontPubic=estimateFront(cy+.014,.055,.025,frontSeed);
+ const frontLower=estimateFront(cy-.027,.040,.022,frontPubic-.006);
+ const type=state.genitalType==='auto'?state.sex:state.genitalType;
+ // Smaller, body-hugging mons pubis: its top surface ends only a few millimetres in front of the body.
+ const moundCenter=[cx,cy+.022,frontPubic-.012],moundR=[.056*size,.043*size,.018*size];
+ addAnatomyEllipsoid(skin,moundCenter,moundR,32,22);
+ if(type==='male'){
+  // One continuous scrotal sac; the former three overlapping spheres caused a bead-like cluster.
+  const sacCenter=[cx,cy-.039,frontLower-.006],sacR=[.028*size,.030*size,.017*size];
+  addAnatomyEllipsoid(skin,sacCenter,sacR,30,20);
+  // A restrained midline fold follows the visible surface rather than adding two separate balls.
+  addAnatomyEllipsoid(detail,[cx,cy-.041,frontLower+.008],[.0012*size,.017*size,.00115*size],18,12);
+  const erect=state.genitalState==='erect';
+  const length=(erect?.126:.074)*(1+Math.max(0,shape)*.08)*size;
+  const rx=(.0105+shape*.0020)*size,ry=(.0098+shape*.0018)*size;
+  const shaftStart=[cx,cy-.006,frontPubic+.005];
+  const axis=addAnatomyTube(skin,shaftStart,length,rx,ry,shape,erect);
+  // The glans is integrated into the shaft tip and kept in proportion.
+  addAnatomyEllipsoid(skin,axis.end,[.0128*size,.0118*size,.0165*size],28,18,-axis.angle);
+  // Subtle ridge and tip detail; no large detached cap/sphere.
+  const t=.76,ringCenter=[cx+shape*.004*Math.sin(Math.PI*t),shaftStart[1]+axis.dy*length*t+shape*.004*Math.sin(Math.PI*t),shaftStart[2]+axis.dz*length*t];
+  addAnatomyEllipsoid(detail,ringCenter,[rx*1.025,ry*1.025,.00135*size],24,12,-axis.angle);
+  const tip=[axis.end[0],axis.end[1]+axis.dy*.013*size,axis.end[2]+axis.dz*.013*size];
+  addAnatomyEllipsoid(detail,tip,[.0031*size,.0038*size,.0013*size],16,10,-axis.angle);
+ }else{
+  // Compact, overlapping outer/inner labia with a narrow central cleft.
+  addAnatomyEllipsoid(skin,[cx-.017*size,cy-.016,frontPubic+.002],[.020*size,.032*size,.0125*size],26,18);
+  addAnatomyEllipsoid(skin,[cx+.017*size,cy-.016,frontPubic+.002],[.020*size,.032*size,.0125*size],26,18);
+  addAnatomyEllipsoid(detail,[cx-.0065*size,cy-.017,frontPubic+.012],[.0064*size,.025*size,.0045*size],22,16);
+  addAnatomyEllipsoid(detail,[cx+.0065*size,cy-.017,frontPubic+.012],[.0064*size,.025*size,.0045*size],22,16);
+  addAnatomyEllipsoid(detail,[cx,cy+.008,frontPubic+.013],[.0052*size,.006*size,.0035*size],18,12);
+ }
+ if(state.pubicHair&&state.pubicHairAmount>.005){
+  let seed=92371;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const amount=Math.max(0,Math.min(1,Number(state.pubicHairAmount)||0));
+  const count=Math.round(amount*118),hairRx=.049*size,hairRy=.034*size;
+  const hairLength=Math.max(.3,Math.min(1.8,Number(state.pubicHairLength)||1));
+  for(let n=0;n<count;n++){
+   const x=(random()*2-1)*hairRx, y=moundCenter[1]-.002-random()*hairRy;
+   const nx=x/hairRx,ny=(y-moundCenter[1])/hairRy,rr=nx*nx+ny*ny;
+   if(rr>.94)continue;
+   // Strand roots sit on the ellipsoid surface, with a tiny offset only to prevent z-fighting.
+   const z=moundCenter[2]+moundR[2]*Math.sqrt(Math.max(.02,1-Math.min(.98,rr)))+.0006;
+   const len=(.0055+random()*.012)*hairLength,leanX=(random()-.5)*.009,leanY=(random()-.45)*.006,width=.00032+random()*.00028;
+   const base=hair.positions.length/3,steps=5;
+   for(let j=0;j<=steps;j++){
+    const t=j/steps,curve=Math.sin(Math.PI*t),xx=cx+x+leanX*t+leanX*.15*curve,yy=y-len*t+leanY*curve,zz=z+.0011*curve;
+    const w=width*(1-.92*t);
+    addAnatomyVertex(hair,xx-w,yy,zz,0,t);addAnatomyVertex(hair,xx+w,yy,zz+.00025,1,t);
+   }
+   for(let j=0;j<steps;j++){const a=base+j*2,b=a+1,c=a+3,d=a+2;hair.indices.push(a,d,c,a,c,b)}
+  }
+ }
+ const texture=anatomyTexture();
+ const skinMat=new T.MeshPhysicalMaterial({name:'AnatomySkin',color:state.genitalSkin,map:texture,bumpMap:texture,bumpScale:.0011,roughness:.64,metalness:0,sheen:.16,sheenRoughness:.82,clearcoat:.025,clearcoatRoughness:.8,side:T.DoubleSide});
+ const detailMat=new T.MeshPhysicalMaterial({name:'AnatomyDetail',color:state.genitalDetailColor,map:texture,bumpMap:texture,bumpScale:.0007,roughness:.65,metalness:0,sheen:.12,sheenRoughness:.84,side:T.DoubleSide});
+ const hairMat=new T.MeshStandardMaterial({name:'PubicHair',color:state.pubicHairColor,roughness:.96,metalness:0,side:T.DoubleSide});
+ return [makeAnatomySkinnedMesh(skin,skinMat,'Anatomy_Skin'),makeAnatomySkinnedMesh(detail,detailMat,'Anatomy_Detail'),makeAnatomySkinnedMesh(hair,hairMat,'Anatomy_PubicHair')].filter(Boolean);
+}
 function updateAnatomyMeshes(){
  if(!ready||!body||!engine)return;
- if(!maleProxyReady){body.visible=true;return;}
- const showProxy=!!state.showAnatomy&&!anatomyCoveringBottom();
- // Never replace or hide the character's body: render the genital patch as an overlay.
- body.visible=true;
- for(const [key,mesh] of Object.entries(maleProxyMeshes)){
-  mesh.visible=showProxy&&key===(state.genitalState==='erect'?'erect':'flaccid');
-  if(mesh.visible)updateMaleProxyGeometry(mesh);
- }
+ if(!state.showAnatomy){removeAnatomyMeshes();anatomySignature='';return;}
+ const signature=[state.sex,state.genitalType,state.genitalState,state.genitalSize,state.genitalShape,state.genitalOffset,state.genitalSkin,state.genitalDetailColor,state.pubicHair,state.pubicHairAmount,state.pubicHairLength,state.pubicHairColor,state.shapeHips,state.shapeLegs].join('|');
+ if(signature!==anatomySignature){removeAnatomyMeshes();anatomyMeshes=buildAnatomyMeshes();anatomySignature=signature;}
+ const visible=!anatomyCoveringBottom();for(const m of anatomyMeshes)m.visible=visible;
 }
-function removeAnatomyMeshes(){
- for(const mesh of Object.values(maleProxyMeshes)){mesh.visible=false;mesh.removeFromParent();mesh.geometry?.dispose();}
- maleProxyMeshes={};maleProxyReady=false;if(body)body.visible=true;
-}
+function removeAnatomyMeshes(){for(const m of anatomyMeshes){m.removeFromParent();m.geometry?.dispose();if(Array.isArray(m.material))m.material.forEach(x=>x.dispose());else m.material?.dispose()}anatomyMeshes=[];}
 
 const browBaseData=new WeakMap();
 function applyBrowControls(root){
@@ -555,7 +483,8 @@ function renderPanel(){
     ${sliderField('shapeCalves','Volumen de pantorrillas',Math.round((state.shapeCalves+1)*50),0,100,1,Math.round((state.shapeCalves+1)*50)+'%',true)}
    </div>
    <div class="presetRow"><button class="choice ${state.bodyPreset==='slim'?'active':''}" data-body-preset="slim">Delgado</button><button class="choice ${state.bodyPreset==='balanced'?'active':''}" data-body-preset="balanced">Equilibrado</button><button class="choice ${state.bodyPreset==='athletic'?'active':''}" data-body-preset="athletic">Atlético</button></div>
-      <div class="note">Los controles de distribución modifican la geometría base del cuerpo y se mantienen al cambiar prendas. El resultado depende de cómo venga construido y ponderado el modelo 3D original.</div>`;
+   ${
+   <div class="note">Los controles de distribución modifican la geometría base del cuerpo y se mantienen al cambiar prendas. El resultado depende de cómo venga construido y ponderado el modelo 3D original.</div>`;
  }else if(currentTab==='face'){
   html=`<div class="panelTitle"><strong>Rostro</strong><small>Formas faciales<br>en el modelo base</small></div>
    <div class="formGrid">${sliderField('noseWidth','Ancho de nariz',state.noseWidth,-1,1,.01,Number(state.noseWidth).toFixed(2))}${sliderField('noseLength','Largo de nariz',state.noseLength,-1,1,.01,Number(state.noseLength).toFixed(2))}${sliderField('noseHeight','Altura de nariz',state.noseHeight,-1,1,.01,Number(state.noseHeight).toFixed(2))}${sliderField('jawWidth','Ancho de mandíbula',state.jawWidth,-1,1,.01,Number(state.jawWidth).toFixed(2))}${sliderField('chin','Forma de mentón',state.chin,-1,1,.01,Number(state.chin).toFixed(2))}${sliderField('cheekbones','Pómulos',state.cheekbones,-1,1,.01,Number(state.cheekbones).toFixed(2))}${sliderField('eyeSize','Tamaño de ojos',state.eyeSize,-1,1,.01,Number(state.eyeSize).toFixed(2))}${sliderField('eyeSpacing','Separación de ojos',state.eyeSpacing,-1,1,.01,Number(state.eyeSpacing).toFixed(2))}${sliderField('eyeTilt','Inclinación de ojos',state.eyeTilt,-1,1,.01,Number(state.eyeTilt).toFixed(2))}${sliderField('lips','Volumen de labios',state.lips,-1,1,.01,Number(state.lips).toFixed(2))}${sliderField('mouthWidth','Ancho de boca',state.mouthWidth,-1,1,.01,Number(state.mouthWidth).toFixed(2))}${sliderField('forehead','Altura de frente',state.forehead,-1,1,.01,Number(state.forehead).toFixed(2))}${sliderField('earSize','Tamaño de orejas',state.earSize,-1,1,.01,Number(state.earSize).toFixed(2))}${sliderField('browThickness','Grosor de cejas',state.browThickness,-1,1,.01,Number(state.browThickness).toFixed(2))}${sliderField('browHeight','Altura de cejas',state.browHeight,-1,1,.01,Number(state.browHeight).toFixed(2))}${sliderField('browAngle','Inclinación de cejas',state.browAngle,-1,1,.01,Number(state.browAngle).toFixed(2))}${sliderField('browSpacing','Separación de cejas',state.browSpacing,-1,1,.01,Number(state.browSpacing).toFixed(2))}${palette('browColor','Color de cejas',hairSwatches)}${palette('eyeColor','Color de ojos',eyeSwatches)}</div>
@@ -588,13 +517,22 @@ function renderPanel(){
    <div class="microLabel">Enfoque de cámara</div><div class="viewButtons"><button class="choice" data-view="full">Cuerpo entero</button><button class="choice" data-view="face">Primer plano</button><button class="choice" data-view="side">Perfil</button></div>
    <div class="note ${clipsReady?'':'warning'}">${clipsReady?'Clips detectados: '+motionClips.map(c=>c.name).join(', '):'El archivo de animaciones aún no terminó de cargar. Los controles permanecerán desactivados hasta que esté disponible.'}</div>`;
  }else if(currentTab==='anatomy'){
-  html=`<div class="panelTitle"><strong>Anatomía masculina</strong><small>Mallas 3D adaptadas al cuerpo</small></div>
+  html=`<div class="panelTitle"><strong>Malla anatómica</strong><small>Geometría 3D procedural</small></div>
    <div class="formGrid">
     ${selectField('showAnatomy','Mostrar malla',[{value:'true',label:'Visible'},{value:'false',label:'Oculta'}],String(state.showAnatomy),true)}
         ${selectField('genitalState','Estado',[{value:'flaccid',label:'Flácido'},{value:'erect',label:'Erecto'}],state.genitalState,true)}
-           </div>
+    ${sliderField('genitalSize','Tamaño',state.genitalSize,.65,1.5,.01,Math.round(state.genitalSize*100)+'%',true)}
+    ${sliderField('genitalShape','Grosor y curvatura',state.genitalShape,-1,1,.01,Number(state.genitalShape).toFixed(2),true)}
+    ${sliderField('genitalOffset','Proyección',state.genitalOffset,-.02,.04,.001,Math.round(state.genitalOffset*1000)+' mm',true)}
+    <div class="field full"><label class="fieldLabel" for="f-genitalSkin"><span>Tono anatómico</span></label><input id="f-genitalSkin" type="color" value="${state.genitalSkin}" data-key="genitalSkin"></div>
+    <div class="field full"><label class="fieldLabel" for="f-genitalDetailColor"><span>Tono de detalles</span></label><input id="f-genitalDetailColor" type="color" value="${state.genitalDetailColor}" data-key="genitalDetailColor"></div>
+    ${selectField('pubicHair','Vello púbico',[{value:'true',label:'Con vello'},{value:'false',label:'Sin vello'}],String(state.pubicHair),true)}
+    ${sliderField('pubicHairAmount','Densidad',state.pubicHairAmount,0,1,.01,Math.round(state.pubicHairAmount*100)+'%',true)}
+    ${sliderField('pubicHairLength','Largo del vello',state.pubicHairLength,.3,1.8,.05,state.pubicHairLength.toFixed(2)+'×',true)}
+    <div class="field full"><label class="fieldLabel" for="f-pubicHairColor"><span>Color del vello</span></label><input id="f-pubicHairColor" type="color" value="${state.pubicHairColor}" data-key="pubicHairColor"></div>
+   </div>
    <div class="formGrid" style="margin-top:8px"><button type="button" class="choice" data-reveal-anatomy>Quitar pantalón e interior</button><button type="button" class="choice" data-view="anatomy">Acercar cámara</button></div>
-   <div class="note">Se usan malla anatómica masculina de MakeHuman adaptada al cuerpo y al esqueleto del visor. El selector alterna entre el modelo flácido y el erecto. Para ver la malla sin solapamiento, quita el pantalón y la ropa interior.</div>`;
+   <div class="note">La malla y su textura se generan dentro de este HTML. La forma se coloca usando la superficie del cuerpo en la zona pélvica; el estado flácido/erecto, el color, la textura y el vello modifican sus mallas. La ropa inferior la oculta hasta quitarla.</div>`;
  }else{
   html=`<div class="panelTitle"><strong>Anatomía</strong><small>Opciones del modelo</small></div><div class="note">Personalización anatómica integrada.</div>`;
  }
@@ -606,7 +544,7 @@ function ageToMorph(years){const y=Math.max(10,Math.min(60,Number(years)||25));i
 function heightToMorph(cm){return Math.max(-1,Math.min(1,cm<170?(cm-170)/20:(cm-170)/30))}
 function stateToValues(){
  if(!engine)return;
- engine.values.age=ageToMorph(state.age);engine.values.height=heightToMorph(state.height);engine.values.weight=state.weight;engine.values.muscle=state.muscle;engine.values.proportions=state.proportions;engine.values.gender=1;
+ engine.values.age=ageToMorph(state.age);engine.values.height=heightToMorph(state.height);engine.values.weight=state.weight;engine.values.muscle=state.muscle;engine.values.proportions=state.proportions;engine.values.gender=state.sex==='male'?1:-1;
  for(const k of ['noseWidth','noseLength','noseHeight','jawWidth','chin','cheekbones','eyeSize','eyeSpacing','eyeTilt','lips','mouthWidth','earSize','forehead','breastSize','breastFirmness','breastHeight','breastSpacing','breastProjection'])engine.values[k]=state[k];
 }
 function applyModel(){
@@ -732,7 +670,6 @@ async function init3D(){
   const wrappedLoader={loadAsync:(p)=>loader.loadAsync(asset(p))};
   clothing=createClothing({loader:wrappedLoader,lang:'en',t:k=>({clothNone:'Sin prenda',clothPrimary:'Color principal',clothSecondary:'Color de detalle',clothLoading:'CARGANDO ROPA…',clothError:'ERROR DE VESTUARIO'}[k]||k),setStatus:(m,isErr)=>{if(m)status(m,isErr);else if(ready)status('MODELO 3D · LISTO')},getBody:()=>body,addPart:m=>{if(!parts.includes(m)){parts.push(m);if(m.name?.startsWith('Cloth_')||m.userData?.ccClothing)addPhysicalShapeMorphs(m)}},getSex:()=>state.sex,underwear:true,onChange:()=>applyModel()});
   if(clothingCatalog?.items?.length)await clothing.init(Promise.resolve(clothingCatalog),hidden,['tshirt','jeans','shoes']);
-  await initMaleProxyMeshes();
   ready=true;stateToValues();applyModel();if(mixer&&motionClips.length)playMotion('idle_breathe');
   if(hc?.styles?.length){hairCatalog=hc;await setHair(state.hair)}
   status(missingAgeMorphs.length?'AVISO: MORPHS DE EDAD AUSENTES':(motionClips.length?'MODELO + ANIMACIONES · LISTO':'MODELO 3D · LISTO'));$('#modelError').style.display='none';$('#liveState').textContent=missingAgeMorphs.length?'EDAD NO VALIDADA':(motionClips.length?'ANIMADO · EN VIVO':'CAMBIOS EN VIVO');

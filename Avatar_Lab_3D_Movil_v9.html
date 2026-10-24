@@ -382,7 +382,7 @@ function buildAnatomyMeshes(){
 
 function updateAnatomyMeshes(){
  if(!ready||!body||!engine)return;
- if(!state.showAnatomy){removeAnatomyMeshes();anatomySignature='';return;}
+ if(!state.showAnatomy||Number(state.age)<18){removeAnatomyMeshes();anatomySignature='';return;}
  const signature=[state.sex,state.genitalType,state.genitalState,state.genitalSize,state.genitalShape,state.genitalOffset,state.genitalSkin,state.genitalDetailColor,state.pubicHair,state.pubicHairAmount,state.pubicHairLength,state.pubicHairColor,state.shapeHips,state.shapeLegs].join('|');
  if(signature!==anatomySignature){removeAnatomyMeshes();anatomyMeshes=buildAnatomyMeshes();anatomySignature=signature;}
  const visible=!anatomyCoveringBottom();for(const m of anatomyMeshes)m.visible=visible;
@@ -517,7 +517,7 @@ function renderPanel(){
     <div class="field full"><label class="fieldLabel" for="f-pubicHairColor"><span>Color del vello</span></label><input id="f-pubicHairColor" type="color" value="${state.pubicHairColor}" data-key="pubicHairColor"></div>
    </div>
    <div class="formGrid" style="margin-top:8px"><button type="button" class="choice" data-reveal-anatomy>Quitar pantalón e interior</button><button type="button" class="choice" data-view="anatomy">Acercar cámara</button></div>
-   <div class="note">La malla y su textura se generan dentro de este HTML, sin descargar otro modelo. El estado flácido/erecto, la forma, los tonos y el vello modifican la geometría generada; la ropa inferior oculta la malla hasta quitarla.</div>`;
+   <div class="note">La malla y su textura se generan dentro de este HTML, sin descargar otro modelo. La anatomía genital adulta se muestra únicamente cuando el personaje está configurado con 18 años o más; el resto del editor sigue funcionando con normalidad. El estado flácido/erecto, la forma, los tonos y el vello modifican la geometría generada; la ropa inferior la oculta hasta quitarla.</div>`;
  }else{
   html=`<div class="panelTitle"><strong>Anatomía</strong><small>Opciones del modelo</small></div><div class="note">Personalización anatómica integrada.</div>`;
  }

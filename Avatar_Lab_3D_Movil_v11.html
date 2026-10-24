@@ -341,52 +341,68 @@ function makeMaleProxyGeometry(info){
  info.pairs=pairs;info.triRows=triRows;info.geometry=geo;
  return geo;
 }
-function maleProxyBodyPositions(info,sourceOnly=false){
- const T=engine.THREE,bodyN=body.geometry.attributes.position.count,base=body.geometry.attributes.position.array;
- const current=new Float32Array(bodyN*3),tmp=new T.Vector3();
- for(let i=0;i<bodyN;i++){
-  T.Mesh.prototype.getVertexPosition.call(body,i,tmp);
-  current[i*3]=tmp.x;current[i*3+1]=tmp.y;current[i*3+2]=tmp.z;
+function solveProxyLinear3(matrix,vector){
+ const a=matrix.map((row,i)=>[...row,vector[i]]);
+ for(let col=0;col<3;col++){
+  let pivot=col;for(let row=col+1;row<3;row++)if(Math.abs(a[row][col])>Math.abs(a[pivot][col]))pivot=row;
+  if(Math.abs(a[pivot][col])<1e-10)return null;
+  [a[col],a[pivot]]=[a[pivot],a[col]];
+  const d=a[col][col];for(let j=col;j<4;j++)a[col][j]/=d;
+  for(let row=0;row<3;row++)if(row!==col){const f=a[row][col];for(let j=col;j<4;j++)a[row][j]-=f*a[col][j];}
  }
- const scaleFor=(arr,ref,axis)=>Math.abs(arr[ref.a*3+axis]-arr[ref.b*3+axis]);
- // MakeHuman proxy scale axes are source OBJ axes (X,Y,Z); this viewer is also Y-up.
- const s1=[scaleFor(current,info.refs.x_scale,0),scaleFor(current,info.refs.y_scale,2),scaleFor(current,info.refs.z_scale,1)];
- const den=[info.refs.x_scale.declared,info.refs.y_scale.declared,info.refs.z_scale.declared];
- const ratio=s1.map((v,i)=>v/Math.max(1e-7,den[i]));
- const fit=new Float32Array(info.rows.length*3),raw=info.obj.positions;
- // The older flaccid asset's authored coordinates use a different overall scale. Calibrate
- // its unmatched helper vertices against all direct base-body correspondences per axis.
- const sourceAxisForTarget=[0,2,1]; // MakeHuman Z-up OBJ -> GLTF Y-up body: (x,y,z) -> (x,z,-y).
- const affine=[0,1,2].map(targetAxis=>{
-  const sourceAxis=sourceAxisForTarget[targetAxis];let n=0,sx=0,sy=0,sxx=0,sxy=0;
-  for(let i=0;i<info.rows.length;i++){const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
-   const x=raw[i][sourceAxis],y=current[row.index*3+targetAxis];n++;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;
-  }
-  const d=n*sxx-sx*sx,a=Math.abs(d)>1e-10?(n*sxy-sx*sy)/d:1,b=n?(sy-a*sx)/n:0;
-  return {a,b,sourceAxis};
- });
+ return a.map(row=>row[3]);
+}
+function fitMaleProxyAffine(info,current,bodyN){
+ // The flaccid MakeHuman OBJ is authored in a different coordinate frame (Z-up,
+ // translated depth origin). A per-axis scale/offset cannot align it with this Y-up GLB.
+ // Fit a full 3D affine map from the proxy's direct body-vertex correspondences.
+ const count=info.rows.length,raw=info.obj.positions,sumX=[0,0,0],sumY=[0,0,0];let n=0;
+ for(let i=0;i<count;i++){
+  const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
+  const x=raw[i],o=row.index*3;n++;
+  for(let k=0;k<3;k++){sumX[k]+=x[k];sumY[k]+=current[o+k];}
+ }
+ if(n<16)throw new Error('No hay suficientes correspondencias para alinear la malla masculina');
+ const meanX=sumX.map(x=>x/n),meanY=sumY.map(x=>x/n),xx=Array.from({length:3},()=>[0,0,0]),xy=Array.from({length:3},()=>[0,0,0]);
+ for(let i=0;i<count;i++){
+  const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
+  const x=raw[i].map((v,k)=>v-meanX[k]),o=row.index*3,y=[current[o]-meanY[0],current[o+1]-meanY[1],current[o+2]-meanY[2]];
+  for(let a=0;a<3;a++)for(let b=0;b<3;b++)xx[a][b]+=x[a]*x[b];
+  for(let target=0;target<3;target++)for(let source=0;source<3;source++)xy[target][source]+=x[source]*y[target];
+ }
+ const A=[];
+ for(let target=0;target<3;target++){const solved=solveProxyLinear3(xx,xy[target]);if(!solved)throw new Error('La transformación de la malla masculina no es invertible');A.push(solved);}
+ const b=A.map((row,target)=>meanY[target]-row.reduce((v,c,k)=>v+c*meanX[k],0));
+ let err=0,samples=0;
+ for(let i=0;i<count;i++){
+  const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
+  const x=raw[i],o=row.index*3;
+  for(let target=0;target<3;target++){let prediction=b[target];for(let k=0;k<3;k++)prediction+=A[target][k]*x[k];const d=prediction-current[o+target];err+=d*d;samples++;}
+ }
+ return {A,b,rms:Math.sqrt(err/Math.max(1,samples)),matched:n};
+}
+function transformMaleProxyPoint(affine,p){return affine.A.map((row,axis)=>row[0]*p[0]+row[1]*p[1]+row[2]*p[2]+affine.b[axis]);}
+function transformMaleProxyOffset(affine,p){return affine.A.map(row=>row[0]*p[0]+row[1]*p[1]+row[2]*p[2]);}
+function maleProxyBodyPositions(info){
+ const T=engine.THREE,bodyN=body.geometry.attributes.position.count;
+ const current=new Float32Array(bodyN*3),tmp=new T.Vector3();
+ for(let i=0;i<bodyN;i++){T.Mesh.prototype.getVertexPosition.call(body,i,tmp);current[i*3]=tmp.x;current[i*3+1]=tmp.y;current[i*3+2]=tmp.z;}
+ const affine=fitMaleProxyAffine(info,current,bodyN),fit=new Float32Array(info.rows.length*3),raw=info.obj.positions;
  let sourceFallbacks=0;
  for(let i=0;i<info.rows.length;i++){
   const row=info.rows[i],o=i*3;
-  if(row.kind==='direct'&&row.index<bodyN){
+  if(row.kind==='direct'&&row.index>=0&&row.index<bodyN){
    const j=row.index*3;fit[o]=current[j];fit[o+1]=current[j+1];fit[o+2]=current[j+2];
   }else if(row.kind==='triangle'&&row.ids.every(j=>j>=0&&j<bodyN)){
-   // Proxy offsets use MakeHuman Z-up axes. Convert the offsets to GLTF Y-up coordinates.
-   const bx=row.weights[0]*current[row.ids[0]*3]+row.weights[1]*current[row.ids[1]*3]+row.weights[2]*current[row.ids[2]*3];
-   const by=row.weights[0]*current[row.ids[0]*3+1]+row.weights[1]*current[row.ids[1]*3+1]+row.weights[2]*current[row.ids[2]*3+1];
-   const bz=row.weights[0]*current[row.ids[0]*3+2]+row.weights[1]*current[row.ids[1]*3+2]+row.weights[2]*current[row.ids[2]*3+2];
-   fit[o]=bx+row.offset[0]*ratio[0];
-   fit[o+1]=by+row.offset[2]*ratio[2];
-   fit[o+2]=bz-row.offset[1]*ratio[1];
+   const offset=transformMaleProxyOffset(affine,row.offset);
+   for(let axis=0;axis<3;axis++)fit[o+axis]=row.weights[0]*current[row.ids[0]*3+axis]+row.weights[1]*current[row.ids[1]*3+axis]+row.weights[2]*current[row.ids[2]*3+axis]+offset[axis];
   }else{
-   // Some flaccid-proxy rows refer to helper vertices omitted from the compact body GLB.
-   // Fit those few points with axis-corrected correspondences from the available body vertices.
-   fit[o]=raw[i][affine[0].sourceAxis]*affine[0].a+affine[0].b;
-   fit[o+1]=raw[i][affine[1].sourceAxis]*affine[1].a+affine[1].b;
-   fit[o+2]=raw[i][affine[2].sourceAxis]*affine[2].a+affine[2].b;sourceFallbacks++;
+   // The flaccid proxy references HM08 helper vertices omitted from the compact GLB.
+   // Map them with a full 3D source-to-body transform instead of a per-axis approximation.
+   const mapped=transformMaleProxyPoint(affine,raw[i]);fit[o]=mapped[0];fit[o+1]=mapped[1];fit[o+2]=mapped[2];sourceFallbacks++;
   }
  }
- info.sourceFallbacks=sourceFallbacks;
+ info.sourceFallbacks=sourceFallbacks;info.affineRms=affine.rms;info.affineMatched=affine.matched;
  return fit;
 }
 function updateMaleProxyGeometry(mesh,force=false){
@@ -440,7 +456,7 @@ async function initMaleProxyMeshes(){
  try{
   const [flaccid,erect]=await Promise.all([loadMaleProxy('flaccid'),loadMaleProxy('erect')]);
   maleProxyMeshes={flaccid,erect};maleProxyReady=true;
-  console.info('[Avatar Lab V11] Male proxy meshes loaded',Object.fromEntries(Object.entries(maleProxyMeshes).map(([k,m])=>[k,{vertices:m.geometry.attributes.position.count,sourceFallbacks:m.userData.maleProxyInfo.sourceFallbacks}])));
+  console.info('[Avatar Lab V11] Male proxy meshes loaded',Object.fromEntries(Object.entries(maleProxyMeshes).map(([k,m])=>[k,{vertices:m.geometry.attributes.position.count,sourceFallbacks:m.userData.maleProxyInfo.sourceFallbacks,affineRms:m.userData.maleProxyInfo.affineRms,affineMatched:m.userData.maleProxyInfo.affineMatched}])));
  }catch(e){
   for(const mesh of Object.values(maleProxyMeshes)){mesh.removeFromParent();mesh.geometry?.dispose();}
   maleProxyMeshes={};maleProxyReady=false;body.visible=true;

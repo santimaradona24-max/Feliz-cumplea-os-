@@ -175,7 +175,7 @@ function status(msg, error=false){const el=$('#status');el.textContent=msg;el.st
 function fmtAge(){return `${state.age} ${state.age===1?'año':'años'}`}
 function updateHud(){
  $('#displayName').textContent=state.name.trim()||'El Viajero';
- $('#desc').textContent=`Humano · ${fmtAge()} · ${state.sex==='male'?'masculino':'femenino'}`;
+ $('#desc').textContent=`Humano · ${fmtAge()} · masculino`;
  $('#heightTag').textContent=`${(state.height/100).toFixed(2).replace('.',',')} m`;
  $('#bodyTag').textContent=state.weight>.38?'Complexión robusta':state.weight<-.38?'Complexión delgada':state.muscle>.4?'Complexión atlética':'Complexión normal';
 }
@@ -340,13 +340,21 @@ function maleProxyBodyPositions(info,sourceOnly=false){
   current[i*3]=tmp.x;current[i*3+1]=tmp.y;current[i*3+2]=tmp.z;
  }
  const scaleFor=(arr,ref,axis)=>Math.abs(arr[ref.a*3+axis]-arr[ref.b*3+axis]);
- const scale=(arr)=>[
-  scaleFor(arr,info.refs.x_scale,0),
-  scaleFor(arr,info.refs.z_scale,1),
-  scaleFor(arr,info.refs.y_scale,2)
- ];
- const s0=scale(base),s1=scale(current),ratio=s0.map((v,i)=>v>1e-7?s1[i]/v:1);
+ // MakeHuman proxy scale axes are source OBJ axes (X,Y,Z); this viewer is also Y-up.
+ const s1=[scaleFor(current,info.refs.x_scale,0),scaleFor(current,info.refs.y_scale,1),scaleFor(current,info.refs.z_scale,2)];
+ const den=[info.refs.x_scale.declared,info.refs.y_scale.declared,info.refs.z_scale.declared];
+ const ratio=s1.map((v,i)=>v/Math.max(1e-7,den[i]));
  const fit=new Float32Array(info.rows.length*3),raw=info.obj.positions;
+ // The older flaccid asset's authored coordinates use a different overall scale. Calibrate
+ // its unmatched helper vertices against all direct base-body correspondences per axis.
+ const affine=[0,1,2].map(axis=>{
+  let n=0,sx=0,sy=0,sxx=0,sxy=0;
+  for(let i=0;i<info.rows.length;i++){const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
+   const x=raw[i][axis],y=current[row.index*3+axis];n++;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;
+  }
+  const d=n*sxx-sx*sx,a=Math.abs(d)>1e-10?(n*sxy-sx*sy)/d:1,b=n?(sy-a*sx)/n:0;
+  return {a,b};
+ });
  let sourceFallbacks=0;
  for(let i=0;i<info.rows.length;i++){
   const row=info.rows[i],o=i*3;
@@ -359,7 +367,7 @@ function maleProxyBodyPositions(info,sourceOnly=false){
   }else{
    // The older flaccid proxy references HM08 helper vertices omitted by this viewer's compact body GLB.
    // Keep those source-model vertices at their authored position and bind them to the pelvis.
-   fit[o]=raw[i][0];fit[o+1]=raw[i][1];fit[o+2]=raw[i][2];sourceFallbacks++;
+   fit[o]=raw[i][0]*affine[0].a+affine[0].b;fit[o+1]=raw[i][1]*affine[1].a+affine[1].b;fit[o+2]=raw[i][2]*affine[2].a+affine[2].b;sourceFallbacks++;
   }
  }
  info.sourceFallbacks=sourceFallbacks;
@@ -636,7 +644,7 @@ panel.addEventListener('input',e=>{if(!e.target.matches('[data-motion-speed]'))r
 
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{currentTab=b.dataset.tab;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));renderPanel();$('#panel').scrollTop=0}));
 document.querySelector('#random').addEventListener('click',async()=>{
- const pick=a=>a[Math.floor(Math.random()*a.length)];state.name=pick(['La Errante','El Guardián','La Exploradora','El Viajero','La Forjadora']);state.sex='male';state.age=10+Math.floor(Math.random()*51);state.height=150+Math.floor(Math.random()*51);state.bodyPreset='custom';state.weight=+(Math.random()*2-1).toFixed(2);state.muscle=+(Math.random()*2-1).toFixed(2);for(const k of SHAPE_KEYS)state[k]=+(Math.random()*1.2-.6).toFixed(2);state.skin=pick(skinSwatches)[1];state.hairColor=pick(hairSwatches)[1];state.eyeColor=pick(eyeSwatches)[1];state.hair=pick(['short02','short04','bob02','bob01','long01','ponytail01','braid01','afro01']);
+ const pick=a=>a[Math.floor(Math.random()*a.length)];state.name=pick(['El Errante','El Guardián','El Viajero','El Forjador']);state.sex='male';state.age=10+Math.floor(Math.random()*51);state.height=150+Math.floor(Math.random()*51);state.bodyPreset='custom';state.weight=+(Math.random()*2-1).toFixed(2);state.muscle=+(Math.random()*2-1).toFixed(2);for(const k of SHAPE_KEYS)state[k]=+(Math.random()*1.2-.6).toFixed(2);state.skin=pick(skinSwatches)[1];state.hairColor=pick(hairSwatches)[1];state.eyeColor=pick(eyeSwatches)[1];state.hair=pick(['short02','short04','bob02','bob01','long01','ponytail01','braid01','afro01']);
  for(const k of ['noseWidth','noseLength','noseHeight','jawWidth','chin','cheekbones','eyeSize','eyeSpacing','eyeTilt','lips','mouthWidth','earSize','forehead'])state[k]=+(Math.random()*1.2-.6).toFixed(2);
  renderPanel();updateHud();applyModel();if(ready){try{await setHair(state.hair);if(clothing){await clothing.setSex(state.sex);const picks=clothingCatalog.items.filter(i=>!i.sex||i.sex===state.sex||i.sex==='*');const top=pick(picks.filter(i=>i.slot==='top'&&!['dress'].includes(i.id)));const bottom=pick(picks.filter(i=>i.slot==='bottom'));const shoes=pick(picks.filter(i=>i.slot==='shoes'));await clothing.setOutfit([top?.id,bottom?.id,shoes?.id].filter(Boolean));}}catch(e){console.warn(e)}}toast('Se generó una apariencia nueva');
 });
@@ -691,7 +699,7 @@ async function init3D(){
   if(engine.mats?.skinUniforms?.ccPoreRepeat) engine.mats.skinUniforms.ccPoreRepeat.value=46;
   repairEyePresentation(modelRoot,body);
   // Loader progress is reported through the 3D status chip, not over the control panel.
-  engine.values={...engine.chars.defaultValues(),gender:state.sex==='male'?1:-1,age:ageToMorph(state.age)};
+  engine.values={...engine.chars.defaultValues(),gender:1,age:ageToMorph(state.age)};
   clothingCatalog=cc;
   const hidden=$('#hiddenClothingUI');
   const wrappedLoader={loadAsync:(p)=>loader.loadAsync(asset(p))};

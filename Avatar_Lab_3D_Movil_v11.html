@@ -408,9 +408,25 @@ function updateMaleProxyGeometry(mesh,force=false){
  if(!mesh||!body||!engine)return;
  const info=mesh.userData.maleProxyInfo;
  const fitSig=JSON.stringify([Object.values(engine.values||{}),SHAPE_KEYS.map(k=>state[k])]);
+ if(info.invalidFitSig===fitSig){mesh.visible=false;return;}
  if(!force&&info.fitSig===fitSig)return;
  const fit=maleProxyBodyPositions(info);
  const geo=info.geometry,pos=geo.attributes.position.array,normals=new Float32Array(info.rows.length*3),pairs=info.pairs;
+ // Guard the pelvic overlay before writing any geometry. The original body remains visible;
+ // a bad correspondence must hide only this added patch, never distort the character.
+ body.updateWorldMatrix(true,false);
+ const hipBone=body.skeleton.bones.find(b=>/^(hips|pelvis)$/i.test(b.name));
+ const hipLocal=hipBone?body.worldToLocal(hipBone.getWorldPosition(new engine.THREE.Vector3())):new engine.THREE.Vector3(0,.87,0);
+ const pelvicBounds={x:[hipLocal.x-.42,hipLocal.x+.42],y:[hipLocal.y-.48,hipLocal.y+.48],z:[hipLocal.z-.52,hipLocal.z+.86]};
+ for(const pair of pairs){
+  const o=pair.mapIndex*3,x=fit[o],y=fit[o+1],z=fit[o+2];
+  if(!Number.isFinite(x+y+z)||x<pelvicBounds.x[0]||x>pelvicBounds.x[1]||y<pelvicBounds.y[0]||y>pelvicBounds.y[1]||z<pelvicBounds.z[0]||z>pelvicBounds.z[1]){
+   info.invalidFitSig=fitSig;info.fitSig=fitSig;mesh.visible=false;
+   console.warn('[Avatar Lab V11] Overlay anatómico fuera de la pelvis; se oculta sin tocar el cuerpo base.',{x,y,z,pelvicBounds});
+   return;
+  }
+ }
+ info.invalidFitSig='';
  for(let i=0;i<pairs.length;i++){
   const src=pairs[i].mapIndex,o=i*3,p=src*3;
   pos[o]=fit[p];pos[o+1]=fit[p+1];pos[o+2]=fit[p+2];

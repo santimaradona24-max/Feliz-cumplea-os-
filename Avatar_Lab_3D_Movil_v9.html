@@ -155,18 +155,18 @@ const ASSETS=BASE+'output/';
 const RAW=BASE+'web/';
 const $=s=>document.querySelector(s);
 const panel=$('#panel');
-const state={name:'El Viajero',sex:'male',age:25,height:172,weight:0,muscle:0,proportions:0,skin:'#c99a80',hairColor:'#3b2a1e',browColor:'#3b2a1e',eyeColor:'#4a2f19',hair:'short02',noseWidth:0,noseLength:0,noseHeight:0,jawWidth:0,chin:0,cheekbones:0,eyeSize:0,eyeSpacing:0,eyeTilt:0,lips:0,mouthWidth:0,earSize:0,forehead:0,browThickness:0,browHeight:0,browAngle:0,browSpacing:0,beard:false,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeAbdomen:0,shapeCalves:0,naturalGray:true,breastSize:.35,breastFirmness:.45,breastHeight:0,breastSpacing:0,breastProjection:0,genitalType:'auto',genitalState:'flaccid',genitalSize:1,genitalShape:0,genitalOffset:0,genitalSkin:'#c99a80',genitalDetailColor:'#b47a78',showAnatomy:true,pubicHair:true,pubicHairAmount:.55,pubicHairLength:1,pubicHairColor:'#3b2a1e',selectedClothId:'tshirt',bodyPreset:'balanced'};
+const state={name:'El Viajero',sex:'male',age:25,height:172,weight:0,muscle:0,proportions:0,skin:'#c99a80',hairColor:'#3b2a1e',browColor:'#3b2a1e',eyeColor:'#4a2f19',hair:'short02',noseWidth:0,noseLength:0,noseHeight:0,jawWidth:0,chin:0,cheekbones:0,eyeSize:0,eyeSpacing:0,eyeTilt:0,lips:0,mouthWidth:0,earSize:0,forehead:0,browThickness:0,browHeight:0,browAngle:0,browSpacing:0,beard:false,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeGluteWidth:0,shapeGluteProjection:0,shapeAbdomen:0,shapeCalves:0,naturalGray:true,breastSize:.35,breastFirmness:.45,breastHeight:0,breastSpacing:0,breastProjection:0,genitalType:'auto',genitalState:'flaccid',genitalSize:1,genitalShape:0,genitalOffset:0,genitalSkin:'#c99a80',genitalDetailColor:'#b47a78',showAnatomy:true,pubicHair:true,pubicHairAmount:.55,pubicHairLength:1,pubicHairColor:'#3b2a1e',selectedClothId:'tshirt',bodyPreset:'balanced'};
 const startState={...state};
 let currentTab='body',engine=null,THREE=null,scene=null,camera=null,renderer=null,controls=null,loader=null,modelRoot=null,body=null,joints=null,parts=[],clothing=null,clothingCatalog=null,hairCatalog=null,hairCache=new Map(),currentHair=null,ready=false,toastTimer=0;
 let anatomyMeshes=[],anatomySignature='',anatomySkinTexture=null;
 let mixer=null, motionClips=[], activeMotion='idle_breathe', currentAction=null, motionSpeed=1, motionPaused=false, frameClock=null, eyeLife=null, applyEyeMorphWeights=null, idleElapsed=0, idleNext=8+Math.random()*6, missingAgeMorphs=[];
-const SHAPE_KEYS=['shapeShoulders','shapeChest','shapeWaist','shapeHips','shapeArms','shapeLegs','shapeGlutes','shapeAbdomen','shapeCalves'];
+const SHAPE_KEYS=['shapeShoulders','shapeChest','shapeWaist','shapeHips','shapeArms','shapeLegs','shapeGlutes','shapeGluteWidth','shapeGluteProjection','shapeAbdomen','shapeCalves'];
 const shapeMorphParts=new WeakSet();
 const BODY_PRESETS={
  balanced:{weight:0,muscle:0,proportions:0,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeAbdomen:0,shapeCalves:0},
- slim:{weight:-.55,muscle:-.18,proportions:-.35,shapeShoulders:-.12,shapeChest:-.12,shapeWaist:-.38,shapeHips:-.16,shapeArms:-.28,shapeLegs:-.24,shapeGlutes:-.25,shapeAbdomen:-.35,shapeCalves:-.12},
- athletic:{weight:-.05,muscle:.58,proportions:.24,shapeShoulders:.32,shapeChest:.18,shapeWaist:-.24,shapeHips:-.03,shapeArms:.36,shapeLegs:.31,shapeGlutes:.15,shapeAbdomen:-.18,shapeCalves:.28},
- sturdy:{weight:.48,muscle:.2,proportions:-.08,shapeShoulders:.12,shapeChest:.2,shapeWaist:.38,shapeHips:.25,shapeArms:.2,shapeLegs:.25,shapeGlutes:.3,shapeAbdomen:.25,shapeCalves:.2}
+ slim:{weight:-.55,muscle:-.18,proportions:-.35,shapeShoulders:-.12,shapeChest:-.12,shapeWaist:-.38,shapeHips:-.16,shapeArms:-.28,shapeLegs:-.24,shapeGlutes:-.25,shapeGluteWidth:-.2,shapeGluteProjection:-.25,shapeAbdomen:-.35,shapeCalves:-.12},
+ athletic:{weight:-.05,muscle:.58,proportions:.24,shapeShoulders:.32,shapeChest:.18,shapeWaist:-.24,shapeHips:-.03,shapeArms:.36,shapeLegs:.31,shapeGlutes:.15,shapeGluteWidth:.08,shapeGluteProjection:.15,shapeAbdomen:-.18,shapeCalves:.28},
+ sturdy:{weight:.48,muscle:.2,proportions:-.08,shapeShoulders:.12,shapeChest:.2,shapeWaist:.38,shapeHips:.25,shapeArms:.2,shapeLegs:.25,shapeGlutes:.3,shapeGluteWidth:.25,shapeGluteProjection:.32,shapeAbdomen:.25,shapeCalves:.2}
 };
 function effectiveHairColor(){if(!engine?.THREE||!state.naturalGray)return state.hairColor;const a=Math.max(0,Math.min(.58,((state.age-40)/20)*.58));return '#'+new engine.THREE.Color(state.hairColor).lerp(new engine.THREE.Color('#aeb1ad'),a).getHexString()}
 const tints=()=>({skin:state.skin,hair:effectiveHairColor(),brows:state.browColor||effectiveHairColor(),eyes:state.eyeColor,lashes:effectiveHairColor()});
@@ -195,6 +195,8 @@ const shapeSpecs=[
  ['shapeLegs',(x,y,z)=>{const g=gauss(y,.49,.32)*smooth(Math.abs(x),.035,.105);const c=(x<0?-1:1)*.17;return [(x-c)*.2*g,0,z*.16*g]}],
  // More localised forms. +Z is the character's front; glute volume moves the posterior surface (-Z).
  ['shapeGlutes',(x,y,z)=>{const g=gauss(y,.755,.105)*smooth(Math.abs(x),.018,.235)*smooth(-z,.012,.145);const side=x<0?-1:1;return [side*.048*g,.006*g,-.105*g]}],
+ ['shapeGluteWidth',(x,y,z)=>{const g=gauss(y,.755,.105)*smooth(Math.abs(x),.018,.235)*smooth(-z,.012,.145);const side=x<0?-1:1;return [side*.058*g,0,0]}],
+ ['shapeGluteProjection',(x,y,z)=>{const g=gauss(y,.755,.11)*smooth(Math.abs(x),.018,.235)*smooth(-z,.012,.145);return [0,.004*g,-.082*g]}],
  ['shapeAbdomen',(x,y,z)=>{const g=gauss(y,1.005,.13)*smooth(Math.abs(x),.012,.205)*smooth(z,.012,.16);return [x*.025*g,0,.068*g]}],
  ['shapeCalves',(x,y,z)=>{const g=gauss(y,.385,.19)*smooth(Math.abs(x),.08,.205);const side=x<0?-1:1;return [side*.025*g,0,z*.045*g]}]
 ];
@@ -459,6 +461,8 @@ function renderPanel(){
     ${sliderField('shapeArms','Volumen de brazos',Math.round((state.shapeArms+1)*50),0,100,1,Math.round((state.shapeArms+1)*50)+'%',true)}
     ${sliderField('shapeLegs','Volumen de piernas',Math.round((state.shapeLegs+1)*50),0,100,1,Math.round((state.shapeLegs+1)*50)+'%',true)}
     ${sliderField('shapeGlutes','Volumen de glúteos',Math.round((state.shapeGlutes+1)*50),0,100,1,Math.round((state.shapeGlutes+1)*50)+'%',true)}
+    ${sliderField('shapeGluteWidth','Ancho de glúteos',Math.round((state.shapeGluteWidth+1)*50),0,100,1,Math.round((state.shapeGluteWidth+1)*50)+'%',true)}
+    ${sliderField('shapeGluteProjection','Proyección de glúteos',Math.round((state.shapeGluteProjection+1)*50),0,100,1,Math.round((state.shapeGluteProjection+1)*50)+'%',true)}
     ${sliderField('shapeAbdomen','Volumen del abdomen',Math.round((state.shapeAbdomen+1)*50),0,100,1,Math.round((state.shapeAbdomen+1)*50)+'%',true)}
     ${sliderField('shapeCalves','Volumen de pantorrillas',Math.round((state.shapeCalves+1)*50),0,100,1,Math.round((state.shapeCalves+1)*50)+'%',true)}
    </div>

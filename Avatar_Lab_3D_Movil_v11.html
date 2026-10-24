@@ -285,6 +285,9 @@ function parseMaleProxyScale(source){
 }
 function makeMaleProxyGeometry(info){
  const T=engine.THREE,pairs=[],indices=[],pairMap=new Map(),triRows=[];
+ const bodyN=body.geometry.attributes.position.count;
+ // The source OBJ is a full-body MakeHuman proxy. Only render triangles containing
+ // vertices newly interpolated/displaced by that proxy, preserving the original body mesh.
  const resolve=c=>{
   const key=c.p+'/'+c.t;
   let i=pairMap.get(key);
@@ -292,9 +295,15 @@ function makeMaleProxyGeometry(info){
   return i;
  };
  for(const tri of info.obj.faces){
+  const patchFace=tri.some(c=>{
+   const row=info.rows[c.p];
+   return !row||row.kind==='triangle'||row.index<0||row.index>=bodyN;
+  });
+  if(!patchFace)continue;
   const outTri=tri.map(resolve);indices.push(outTri[0],outTri[1],outTri[2]);
   triRows.push([tri[0].p,tri[1].p,tri[2].p]);
  }
+ if(!indices.length)throw new Error('El proxy no contiene caras anatómicas para superponer');
  const geo=new T.BufferGeometry(),p=new Float32Array(pairs.length*3),uv=new Float32Array(pairs.length*2);
  for(let i=0;i<pairs.length;i++){
   const pair=pairs[i],tex=pair.uvIndex>=0?info.obj.uvs[pair.uvIndex]:[0,0];
@@ -341,19 +350,20 @@ function maleProxyBodyPositions(info,sourceOnly=false){
  }
  const scaleFor=(arr,ref,axis)=>Math.abs(arr[ref.a*3+axis]-arr[ref.b*3+axis]);
  // MakeHuman proxy scale axes are source OBJ axes (X,Y,Z); this viewer is also Y-up.
- const s1=[scaleFor(current,info.refs.x_scale,0),scaleFor(current,info.refs.y_scale,1),scaleFor(current,info.refs.z_scale,2)];
+ const s1=[scaleFor(current,info.refs.x_scale,0),scaleFor(current,info.refs.y_scale,2),scaleFor(current,info.refs.z_scale,1)];
  const den=[info.refs.x_scale.declared,info.refs.y_scale.declared,info.refs.z_scale.declared];
  const ratio=s1.map((v,i)=>v/Math.max(1e-7,den[i]));
  const fit=new Float32Array(info.rows.length*3),raw=info.obj.positions;
  // The older flaccid asset's authored coordinates use a different overall scale. Calibrate
  // its unmatched helper vertices against all direct base-body correspondences per axis.
- const affine=[0,1,2].map(axis=>{
-  let n=0,sx=0,sy=0,sxx=0,sxy=0;
+ const sourceAxisForTarget=[0,2,1]; // MakeHuman Z-up OBJ -> GLTF Y-up body: (x,y,z) -> (x,z,-y).
+ const affine=[0,1,2].map(targetAxis=>{
+  const sourceAxis=sourceAxisForTarget[targetAxis];let n=0,sx=0,sy=0,sxx=0,sxy=0;
   for(let i=0;i<info.rows.length;i++){const row=info.rows[i];if(row.kind!=='direct'||row.index<0||row.index>=bodyN)continue;
-   const x=raw[i][axis],y=current[row.index*3+axis];n++;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;
+   const x=raw[i][sourceAxis],y=current[row.index*3+targetAxis];n++;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;
   }
   const d=n*sxx-sx*sx,a=Math.abs(d)>1e-10?(n*sxy-sx*sy)/d:1,b=n?(sy-a*sx)/n:0;
-  return {a,b};
+  return {a,b,sourceAxis};
  });
  let sourceFallbacks=0;
  for(let i=0;i<info.rows.length;i++){
@@ -361,13 +371,19 @@ function maleProxyBodyPositions(info,sourceOnly=false){
   if(row.kind==='direct'&&row.index<bodyN){
    const j=row.index*3;fit[o]=current[j];fit[o+1]=current[j+1];fit[o+2]=current[j+2];
   }else if(row.kind==='triangle'&&row.ids.every(j=>j>=0&&j<bodyN)){
-   for(let axis=0;axis<3;axis++){
-    fit[o+axis]=row.weights[0]*current[row.ids[0]*3+axis]+row.weights[1]*current[row.ids[1]*3+axis]+row.weights[2]*current[row.ids[2]*3+axis]+row.offset[axis]*ratio[axis];
-   }
+   // Proxy offsets use MakeHuman Z-up axes. Convert the offsets to GLTF Y-up coordinates.
+   const bx=row.weights[0]*current[row.ids[0]*3]+row.weights[1]*current[row.ids[1]*3]+row.weights[2]*current[row.ids[2]*3];
+   const by=row.weights[0]*current[row.ids[0]*3+1]+row.weights[1]*current[row.ids[1]*3+1]+row.weights[2]*current[row.ids[2]*3+1];
+   const bz=row.weights[0]*current[row.ids[0]*3+2]+row.weights[1]*current[row.ids[1]*3+2]+row.weights[2]*current[row.ids[2]*3+2];
+   fit[o]=bx+row.offset[0]*ratio[0];
+   fit[o+1]=by+row.offset[2]*ratio[2];
+   fit[o+2]=bz-row.offset[1]*ratio[1];
   }else{
-   // The older flaccid proxy references HM08 helper vertices omitted by this viewer's compact body GLB.
-   // Keep those source-model vertices at their authored position and bind them to the pelvis.
-   fit[o]=raw[i][0]*affine[0].a+affine[0].b;fit[o+1]=raw[i][1]*affine[1].a+affine[1].b;fit[o+2]=raw[i][2]*affine[2].a+affine[2].b;sourceFallbacks++;
+   // Some flaccid-proxy rows refer to helper vertices omitted from the compact body GLB.
+   // Fit those few points with axis-corrected correspondences from the available body vertices.
+   fit[o]=raw[i][affine[0].sourceAxis]*affine[0].a+affine[0].b;
+   fit[o+1]=raw[i][affine[1].sourceAxis]*affine[1].a+affine[1].b;
+   fit[o+2]=raw[i][affine[2].sourceAxis]*affine[2].a+affine[2].b;sourceFallbacks++;
   }
  }
  info.sourceFallbacks=sourceFallbacks;
@@ -410,7 +426,7 @@ async function loadMaleProxy(stateName){
  const skinMat=[].concat(body.material||[]).find(m=>m&&engine.materialRole(m.name)==='skin')||[].concat(body.material||[])[0];
  const material=skinMat||new T.MeshStandardMaterial({color:state.skin,roughness:.72,side:T.DoubleSide});
  const mesh=new T.SkinnedMesh(geometry,material);
- mesh.name=stateName==='flaccid'?'MaleBody_FlaccidProxy':'MaleBody_ErectProxy';
+ mesh.name=stateName==='flaccid'?'MaleAnatomy_FlaccidOverlay':'MaleAnatomy_ErectOverlay';
  mesh.position.copy(body.position);mesh.quaternion.copy(body.quaternion);mesh.scale.copy(body.scale);
  mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=0;
  (body.parent||modelRoot).add(mesh);mesh.bind(body.skeleton,body.bindMatrix);
@@ -440,7 +456,8 @@ function updateAnatomyMeshes(){
  if(!ready||!body||!engine)return;
  if(!maleProxyReady){body.visible=true;return;}
  const showProxy=!!state.showAnatomy&&!anatomyCoveringBottom();
- body.visible=!showProxy;
+ // The base body is never replaced or hidden; only the filtered pelvic overlay changes.
+ body.visible=true;
  for(const [key,mesh] of Object.entries(maleProxyMeshes)){
   mesh.visible=showProxy&&key===(state.genitalState==='erect'?'erect':'flaccid');
   if(mesh.visible)updateMaleProxyGeometry(mesh);
@@ -448,7 +465,7 @@ function updateAnatomyMeshes(){
 }
 function removeAnatomyMeshes(){
  for(const mesh of Object.values(maleProxyMeshes)){mesh.visible=false;mesh.removeFromParent();mesh.geometry?.dispose();}
- maleProxyMeshes={};maleProxyReady=false;body.visible=true;
+ maleProxyMeshes={};maleProxyReady=false;if(body)body.visible=true;
 }
 
 const browBaseData=new WeakMap();

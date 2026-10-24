@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17100a">
+<title>Avatar Lab — Creador de personajes V9</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<style>
+:root{color-scheme:dark;--bg:#100c08;--panel:#21170f;--panel2:#2b1f14;--gold:#d4ad68;--goldHi:#f5d99c;--edge:#76502a;--text:#f6ead2;--muted:#c0ad8c;--danger:#e3a18b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090705;color:var(--text);font-family:Georgia,'Times New Roman',serif;overscroll-behavior:none}
+button,input,select{font:inherit}button{cursor:pointer;touch-action:manipulation}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--goldHi);outline-offset:2px}
+#app{height:100vh;height:100dvh;width:100%;max-width:850px;margin:0 auto;display:grid;grid-template-rows:auto minmax(195px,34dvh) minmax(0,1fr);overflow:hidden;background:linear-gradient(150deg,#2b2015 0%,#17100b 40%,#21170f 100%);border-inline:1px solid #664622;box-shadow:0 0 35px #000a}
+header{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top) + 7px) 12px 8px;background:linear-gradient(#3b2918,#1d140c);border-bottom:2px solid #98703b;box-shadow:0 3px 10px #0007;z-index:3}
+.brandWrap{display:flex;align-items:center;gap:10px;min-width:0}.sigil{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border:1px solid var(--gold);background:linear-gradient(135deg,#4b321b,#15100a);box-shadow:inset 0 0 0 3px #2c1d10;color:var(--goldHi);font-size:20px}.brand{font-size:clamp(13px,3.9vw,18px);font-weight:bold;letter-spacing:.12em;white-space:nowrap;text-shadow:0 2px 3px #000}.brand em{font-style:normal;color:var(--goldHi)}.subtitle{font:9px/1.25 system-ui,sans-serif;color:#c9ad7d;letter-spacing:.09em;margin-top:3px}.status{flex:0 0 auto;max-width:37%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 8px;border:1px solid #876335;background:#110c08;color:#f4d69a;font:10px system-ui,sans-serif}
+#stage{position:relative;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 50% 30%,#66513a 0%,#392b1d 34%,#1b140d 75%,#0d0906 100%);border-bottom:2px solid #8a6134;isolation:isolate}
+#stage:before{content:"";position:absolute;inset:0;z-index:-1;opacity:.2;background:repeating-linear-gradient(90deg,transparent 0 48px,#a7783e 49px 51px,transparent 52px 100px),linear-gradient(0deg,#090705aa,transparent 54%,#0004)}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;z-index:0}
+#hud{position:absolute;z-index:2;left:9px;right:9px;top:9px;display:flex;justify-content:space-between;align-items:flex-start;gap:7px;pointer-events:none}.hudCard{min-width:0;max-width:58%;padding:7px 9px;background:#160f0bdc;border:1px solid #9a7242;box-shadow:inset 0 0 0 2px #26190e}.hudCard.right{max-width:40%;text-align:right}.hudTitle{display:block;font-weight:bold;font-size:clamp(10px,2.8vw,13px);letter-spacing:.04em;text-transform:uppercase;color:#ffe4ad;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hudSub{display:block;margin-top:3px;font:10px system-ui,sans-serif;color:#d5bc91}.hudBadge{display:inline-block;margin-top:4px;padding:3px 5px;border:1px solid #72502d;color:#e9c98b;font:9px system-ui,sans-serif}
+#hint{position:absolute;z-index:2;bottom:8px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);padding:7px 10px;border:1px solid #8d6738;background:#100b08de;color:#e6d1aa;font:10px/1.3 system-ui,sans-serif;text-align:center;pointer-events:none;white-space:normal}
+#modelError{display:none;position:absolute;z-index:3;left:12px;right:12px;top:50%;transform:translateY(-50%);padding:12px;background:#1a100deF;border:1px solid #c98759;color:#ffe3c4;font:12px/1.45 system-ui,sans-serif;text-align:center;overflow-wrap:anywhere}
+#bottom{min-height:0;overflow:hidden;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;background:repeating-linear-gradient(135deg,#21170f 0 7px,#251b12 7px 14px);padding-bottom:env(safe-area-inset-bottom)}
+.sectionHeading{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px 7px;background:linear-gradient(#342418,#21170f);border-bottom:1px solid #664626}.sectionHeading strong{font-size:clamp(11px,3vw,14px);line-height:1.25;letter-spacing:.07em;text-transform:uppercase;color:#f4d49a}.sectionHeading span{flex:0 0 auto;font:9px system-ui,sans-serif;color:#c5a978;white-space:nowrap}
+.tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:7px 7px;background:#17100b;border-bottom:1px solid #5b3c22;min-width:0}.tab{min-width:0;min-height:39px;padding:7px 2px;background:linear-gradient(#3a291b,#21160d);border:1px solid #73502d;border-bottom:3px solid #4d341d;color:#d8c29c;font:clamp(9px,2.7vw,11px) system-ui,sans-serif;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tab.active{color:#fff0c7;background:linear-gradient(#8d6335,#4e3219);border-color:#e3b96c;border-bottom-color:#f7d88e;box-shadow:inset 0 0 0 1px #523518,0 0 8px #e5b9692b}
+#panel{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:10px 12px 16px;scrollbar-width:thin;scrollbar-color:#80603d #1a120b;-webkit-overflow-scrolling:touch}
+.panelTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 1px 8px;margin-bottom:8px;border-bottom:1px solid #5e4229}.panelTitle strong{font-size:15px;color:#f4d49a}.panelTitle small{font:9px system-ui,sans-serif;color:#c8ab7d;text-align:right}
+.fieldLabel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:10px 1px 5px;font:12px system-ui,sans-serif;color:#e1cba4}.fieldLabel b{font-weight:750;color:#fff0c9;white-space:nowrap}.fieldHint{display:block;margin-top:3px;font:10px/1.35 system-ui,sans-serif;color:#b9a17a}
+input[type=range]{display:block;width:100%;height:30px;margin:2px 0 7px;accent-color:#e0b369;cursor:pointer}input[type=text],select{display:block;width:100%;min-width:0;min-height:43px;border-radius:2px;padding:10px 11px;border:1px solid #76502c;background:linear-gradient(#302317,#1b120b);color:#f8ecd4;font:13px system-ui,sans-serif}input[type=color]{width:100%;height:43px;padding:3px;border:1px solid #76502c;background:#20150c;border-radius:2px}
+.formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}.field{min-width:0}.field.full{grid-column:1/-1}.divider{border:0;border-top:1px solid #51371f;margin:13px 0}
+.swatches{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}.swatch{min-width:0;min-height:48px;padding:4px 3px 5px;border:1px solid #5d4229;background:#1b120b;color:#d7c19b;font:9px system-ui,sans-serif}.swatch .chip{display:block;height:22px;margin-bottom:4px;border:1px solid #ffffff45;box-shadow:inset 0 0 5px #0005}.swatch.active{border-color:#f4cb7c;box-shadow:0 0 0 1px #bd8d4b}.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.choice{min-width:0;min-height:47px;padding:8px 5px;border:1px solid #684725;border-bottom:3px solid #4b3018;background:linear-gradient(145deg,#382819,#21160d);color:#e2cfb0;font:11px/1.2 system-ui,sans-serif;text-align:center}.choice.active{border-color:#edc579;border-bottom-color:#f8d88f;background:linear-gradient(145deg,#7b562d,#3e2815);color:#fff0ca}.choice:disabled{opacity:.42;filter:grayscale(.7);border-style:dashed;cursor:not-allowed}
+.note{margin:10px 1px 0;padding:9px 10px;background:#2b2016;border-left:3px solid #a77a40;color:#cfb991;font:10px/1.45 system-ui,sans-serif}.note.warning{border-left-color:#c98759;color:#f0c6a1}.actions{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:6px;padding:8px 8px max(8px,env(safe-area-inset-bottom));background:linear-gradient(#20160e,#130d08);border-top:1px solid #70502f;box-shadow:0 -5px 12px #0004;z-index:2}.action{min-width:0;min-height:45px;padding:8px 4px;border:1px solid #78542f;border-bottom:3px solid #4d331b;background:linear-gradient(#48311f,#26180e);color:#ead5af;font:clamp(9px,2.7vw,11px) system-ui,sans-serif;font-weight:800;letter-spacing:.01em;white-space:normal;line-height:1.15}.action.primary{background:linear-gradient(#e0b76d,#98602f);border-color:#f4d28d;border-bottom-color:#563416;color:#23170b;text-shadow:0 1px #ffe5ae}.action:active,.choice:active,.tab:active{filter:brightness(1.1)}.action:disabled{opacity:.5}
+#toast{display:none;position:absolute;z-index:8;bottom:calc(env(safe-area-inset-bottom) + 80px);left:50%;transform:translateX(-50%);max-width:calc(100% - 30px);padding:10px 13px;background:#1d130cf5;border:1px solid #dfb76f;color:#ffe6b6;font:12px/1.35 system-ui,sans-serif;text-align:center;box-shadow:0 8px 28px #000b;pointer-events:none}
+.smallMeta{font:10px/1.45 system-ui,sans-serif;color:#baa27d;margin:6px 0}.hiddenLoader{display:none!important}
+@media(max-width:420px){.sigil{width:29px;height:29px;flex-basis:29px;font-size:18px}.brandWrap{gap:8px}.subtitle{font-size:8px;letter-spacing:.06em}.status{font-size:9px;padding:6px 5px;max-width:32%}.sectionHeading{padding-inline:9px}.sectionHeading span{font-size:8px}.hudCard{padding:6px 7px}.hudSub{font-size:9px}.hudBadge{font-size:8px}.formGrid{grid-template-columns:1fr}.field.full{grid-column:auto}.swatches{grid-template-columns:repeat(5,minmax(0,1fr))}.actions{gap:5px;padding-inline:6px}}
+@media(max-height:720px){#app{grid-template-rows:auto minmax(175px,30dvh) minmax(0,1fr)}header{padding-top:max(5px,env(safe-area-inset-top));padding-bottom:6px}.sigil{height:28px;width:28px;flex-basis:28px}.tabs{padding-block:5px}.tab{min-height:35px}.sectionHeading{padding-block:6px}.actions{padding-top:5px}}
+@media(min-width:700px){#app{border-inline:1px solid #76532d}.formGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.swatches{grid-template-columns:repeat(8,minmax(0,1fr))}}
+
+/* V6 visual pass: a more inviting fantasy-RPG character forge, with clear hit areas and no overlapping controls. */
+:root{--bg:#090f18;--panel:#101a26;--panel2:#172535;--gold:#d8b56e;--goldHi:#f6dfa0;--edge:#3d6b74;--text:#edf5ef;--muted:#9fb7b5;--danger:#e3a18b}
+#app{background:radial-gradient(ellipse at 50% 0%,#243b4a 0%,#121d2b 34%,#0b111b 78%);border-color:#294e59;box-shadow:0 0 46px #000b}
+header{background:linear-gradient(105deg,#152a36,#121a29 62%,#282018);border-bottom-color:#b58c4b}
+.sigil{border-color:#71c8bc;color:#b6f4e0;background:linear-gradient(135deg,#174b50,#111824);box-shadow:inset 0 0 0 3px #132832}
+.brand em{color:#86e0cc}.subtitle{color:#a3c9c2}
+.status{border-color:#3e7778;background:#0d171f;color:#b7efdf}
+#stage{background:radial-gradient(ellipse at 50% 27%,#436b70 0%,#233d4b 30%,#121c2a 67%,#080f18 100%);border-bottom-color:#547f7d}
+#stage:before{opacity:.18;background:radial-gradient(circle at 50% 65%,transparent 0 26%,#9bc6ba18 27% 27.5%,transparent 28%),repeating-linear-gradient(90deg,transparent 0 60px,#89b7a916 61px 62px,transparent 63px 100px),linear-gradient(0deg,#03080dcc,transparent 60%,#0003)}
+.hudCard{background:linear-gradient(145deg,#0e1822eF,#101b25dc);border-color:#527b7d;box-shadow:inset 0 0 0 1px #203b43,0 7px 22px #0004;border-radius:7px}
+.hudTitle{color:#d9f8e9}.hudSub{color:#bdd7d0}.hudBadge{border-color:#3e7778;color:#aee8d5}
+#hint{background:#0b151deF;border-color:#527b7d;color:#d3eee3;border-radius:5px}
+#bottom{background:linear-gradient(135deg,#111d29,#101721 60%,#171b22);}
+.sectionHeading{background:linear-gradient(100deg,#1b303c,#141e2a);border-bottom-color:#345b61}.sectionHeading strong{color:#d7f2e7}.sectionHeading span{color:#8acdbd}
+.tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:7px;background:#0c141f;border-bottom-color:#2b4c56}
+.tab{min-height:35px;border-radius:4px;border-color:#304d59;border-bottom-color:#213843;background:linear-gradient(#243d49,#152633);color:#bed8d3;font:11px/1.1 system-ui,sans-serif;letter-spacing:.015em}
+.tab.active{color:#eafff4;background:linear-gradient(#34786f,#1e4d51);border-color:#8ed6bd;border-bottom-color:#b8f1d7;box-shadow:inset 0 0 0 1px #153b3d,0 0 12px #44c6a91b}
+#panel{scrollbar-color:#477c7a #101923}
+.panelTitle{border-bottom-color:#2e5158}.panelTitle strong{color:#d4f1e5}
+.fieldLabel{color:#c5e0d8}.fieldLabel b{color:#f2ffcf}
+input[type=range]{accent-color:#65d2b5}
+input[type=text],select{border-color:#365e66;background:linear-gradient(#1a2b37,#101a24);color:#f1fbf6;border-radius:5px}
+input[type=color]{border-color:#365e66;background:#101a24;border-radius:5px}
+.swatch{border-radius:5px;border-color:#35545a;background:#15232d;color:#bdd8d0}.swatch.active{border-color:#a3ead1;box-shadow:0 0 0 1px #55bfa5}
+.choice{border-radius:5px;border-color:#395d63;border-bottom-color:#203c45;background:linear-gradient(145deg,#24424a,#142630);color:#cce8df}
+.choice.active{border-color:#95e4c4;border-bottom-color:#b9f6d6;background:linear-gradient(145deg,#31796f,#1a4b52);color:#f0fff7}
+.note{background:#142531;border-left-color:#5ab89f;color:#c0ddd5;border-radius:0 5px 5px 0}.note.warning{border-left-color:#d3a65b;color:#f3d9aa}
+.actions{background:linear-gradient(#15232d,#0a1119);border-top-color:#31525b;box-shadow:0 -5px 15px #0006}.action{border-color:#3d636b;border-bottom-color:#213e47;background:linear-gradient(#2c4a53,#162b35);color:#d5ebe3;border-radius:4px}.action.primary{background:linear-gradient(#a4e2c3,#458e81);border-color:#c0f4d7;border-bottom-color:#32665e;color:#0b211e;text-shadow:none}
+#toast{background:#10232af7;border-color:#8de1bf;color:#ecfff6;border-radius:8px}
+.motionGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.motionBtn{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 3px;border:1px solid #355d66;border-bottom:3px solid #203f49;border-radius:5px;background:linear-gradient(#213d49,#142630);color:#d0eee5;font:11px system-ui,sans-serif}.motionBtn .glyph{font-size:17px;color:#8ee1c2}.motionBtn.active{border-color:#91e5c3;background:linear-gradient(#32766d,#1b4850);color:white}.viewButtons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.presetRow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:8px 0}.microLabel{font:10px system-ui,sans-serif;color:#94b9b4;letter-spacing:.08em;text-transform:uppercase;margin:13px 0 6px}.sectionCallout{display:flex;gap:9px;align-items:center;padding:10px;border:1px solid #365b62;background:linear-gradient(110deg,#19343c,#13222d);border-radius:5px;font:11px/1.4 system-ui,sans-serif;color:#c8e7db}.sectionCallout strong{display:block;color:#f0f7d6;margin-bottom:3px}
+@media(max-width:420px){.tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:6px}.tab{min-height:34px;font-size:10px}.sectionHeading{padding-inline:9px}.sectionHeading span{font-size:8px}.hudCard{padding:6px 7px}.hudSub{font-size:9px}.hudBadge{font-size:8px}.formGrid{grid-template-columns:1fr}.field.full{grid-column:auto}.swatches{grid-template-columns:repeat(5,minmax(0,1fr))}.actions{gap:5px;padding-inline:6px}.motionGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-height:720px){#app{grid-template-rows:auto minmax(168px,27dvh) minmax(0,1fr)}.tabs{padding-block:4px}.tab{min-height:31px}.sectionHeading{padding-block:5px}.actions{padding-top:5px}}
+
+
+/* V6: game-first layout. Give the avatar more screen area; keep editor compact and touch-friendly. */
+#app{grid-template-rows:auto minmax(285px,46dvh) minmax(0,1fr);background:radial-gradient(ellipse at 50% 0%,#203b49 0%,#101c29 42%,#080f18 100%);}
+#bottom{grid-template-rows:auto minmax(0,1fr) auto;background:linear-gradient(150deg,#111f2c,#0b121b 70%,#17222a);}
+.sectionHeading{display:none!important}
+.tabs{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;padding:5px 5px;background:#0a141e;border-bottom-color:#2f525b;}
+.tab{min-height:38px;padding:5px 1px;font-size:clamp(8px,2.25vw,10px);letter-spacing:-.025em;overflow:hidden;text-overflow:ellipsis;}
+#panel{padding:7px 9px 12px;scrollbar-width:none;}
+#panel::-webkit-scrollbar{display:none}
+.panelTitle{padding-bottom:5px;margin-bottom:3px}
+.panelTitle strong{font-size:13px;letter-spacing:.015em}
+.panelTitle small{display:none}
+#hud{top:7px;left:7px;right:7px;justify-content:flex-start}
+#hud .hudCard:first-child{display:flex;align-items:center;gap:7px;max-width:78%;padding:5px 8px;border-radius:999px;background:#08141ce8;border-color:#4f807e;box-shadow:0 3px 14px #0005;backdrop-filter:blur(8px)}
+#hud .hudTitle{font:700 10px/1.2 system-ui,sans-serif;letter-spacing:.01em;text-transform:none;color:#e0fff2;max-width:130px}
+#hud #desc{font:9px/1.2 system-ui,sans-serif;color:#b9dbd4;margin:0;max-width:125px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hud #bodyTag,#hud .hudCard.right{display:none!important}
+#hint{display:none!important}
+.formGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 9px}
+.field.full{grid-column:1/-1}
+.fieldLabel{font-size:10px;margin:6px 1px 2px}
+input[type=range]{height:27px;margin:0 0 2px}
+input[type=text],select{min-height:36px;padding:7px 9px;font-size:12px}
+input[type=color]{height:36px}
+.swatches{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.swatch{min-height:39px;padding:3px 2px;font-size:8px}
+.swatch .chip{height:17px}
+.choices{gap:5px}.choice{min-height:39px;padding:6px 3px;font-size:10px}
+.microLabel{margin:9px 0 4px;font-size:9px}
+.presetRow{gap:5px;margin:5px 0}
+.sectionCallout{padding:7px;gap:7px;font-size:10px}
+.sectionCallout strong{margin-bottom:2px}
+.note{display:none!important}
+.actions{grid-template-columns:1fr 1fr 1.05fr;gap:5px;padding:5px 6px max(5px,env(safe-area-inset-bottom));}
+.action{min-height:39px;padding:5px 3px;font-size:9px;border-radius:5px}
+.motionGrid{gap:5px}.motionBtn{min-height:42px;font-size:10px}
+.smallMeta{font-size:9px}
+@media(max-width:420px){
+ .sigil{width:28px;height:28px;flex-basis:28px}
+ .subtitle{font-size:8px}
+ .status{font-size:8px;max-width:32%;padding:5px 4px}
+ .tabs{gap:2px;padding-inline:4px}.tab{font-size:8px;min-height:36px}
+ .formGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.field.full{grid-column:1/-1}
+ .swatches{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+@media(max-height:720px){#app{grid-template-rows:auto minmax(210px,38dvh) minmax(0,1fr)}.actions{padding-top:4px}.tab{min-height:33px}}
+@media(orientation:landscape) and (max-height:560px){
+ #app{grid-template-columns:minmax(0,1fr) minmax(310px,43vw);grid-template-rows:auto minmax(0,1fr)}
+ header{grid-column:1/-1;grid-row:1;padding-block:5px}
+ #stage{grid-column:1;grid-row:2;min-height:0;border-bottom:0;border-right:1px solid #31525b}
+ #bottom{grid-column:2;grid-row:2;min-height:0}
+ .tabs{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,auto)}
+ #panel{padding:6px}
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+ <header>
+  <div class="brandWrap"><div class="sigil">⚒</div><div style="min-width:0"><div class="brand">AVATAR <em>LAB</em></div><div class="subtitle">CREÁ TU AVENTURERO</div></div></div>
+  <div class="status" id="status">CARGANDO MODELO…</div>
+ </header>
+ <section id="stage">
+  <canvas id="view" aria-label="Modelo humano 3D; girá con un dedo"></canvas>
+  <div id="hud"><div class="hudCard"><strong class="hudTitle" id="displayName">El Viajero</strong><span class="hudSub" id="desc">Humano · 25 años · masculino</span><span class="hudBadge" id="bodyTag">Complexión normal</span></div><div class="hudCard right"><strong class="hudTitle">VISTA 3D</strong><span class="hudSub" id="heightTag">1,72 m</span><span class="hudBadge">ARRASTRÁ PARA GIRAR</span></div></div>
+  <div id="hint">Deslizá un dedo sobre el modelo para girarlo · Pellizcá para acercar</div>
+  <div id="modelError" role="status"></div>
+  <div id="toast" role="status"></div>
+ </section>
+ <section id="bottom">
+  <div class="sectionHeading"><strong>✦ TU PERSONAJE</strong><span id="liveState">CAMBIOS EN VIVO</span></div>
+  <nav class="tabs" aria-label="Categorías de personalización">
+   <button class="tab active" data-tab="body">Cuerpo</button><button class="tab" data-tab="face">Rostro</button><button class="tab" data-tab="hair">Pelo</button><button class="tab" data-tab="clothes">Ropa</button><button class="tab" data-tab="motion">Acción</button><button class="tab" data-tab="anatomy">Anatomía</button>
+  </nav>
+  <div id="panel" aria-live="polite"></div>
+  <div class="actions"><button class="action" id="random">✧ ALEATORIO</button><button class="action" id="reset">↶ REINICIAR</button><button class="action primary" id="enter">GUARDAR ↗</button></div>
+ </section>
+</div>
+<div id="hiddenClothingUI" class="hiddenLoader" aria-hidden="true"></div>
+<script type="module">
+const BASE='https://cdn.jsdelivr.net/gh/kblood/CharacterCreator@master/';
+const ASSETS=BASE+'output/';
+const RAW=BASE+'web/';
+const $=s=>document.querySelector(s);
+const panel=$('#panel');
+const state={name:'El Viajero',sex:'male',age:25,height:172,weight:0,muscle:0,proportions:0,skin:'#c99a80',hairColor:'#3b2a1e',browColor:'#3b2a1e',eyeColor:'#4a2f19',hair:'short02',noseWidth:0,noseLength:0,noseHeight:0,jawWidth:0,chin:0,cheekbones:0,eyeSize:0,eyeSpacing:0,eyeTilt:0,lips:0,mouthWidth:0,earSize:0,forehead:0,browThickness:0,browHeight:0,browAngle:0,browSpacing:0,beard:false,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeAbdomen:0,shapeCalves:0,naturalGray:true,breastSize:.35,breastFirmness:.45,breastHeight:0,breastSpacing:0,breastProjection:0,genitalType:'auto',genitalState:'flaccid',genitalSize:1,genitalShape:0,genitalOffset:0,genitalSkin:'#c99a80',genitalDetailColor:'#b47a78',showAnatomy:true,pubicHair:true,pubicHairAmount:.55,pubicHairLength:1,pubicHairColor:'#3b2a1e',selectedClothId:'tshirt',bodyPreset:'balanced'};
+const startState={...state};
+let currentTab='body',engine=null,THREE=null,scene=null,camera=null,renderer=null,controls=null,loader=null,modelRoot=null,body=null,joints=null,parts=[],clothing=null,clothingCatalog=null,hairCatalog=null,hairCache=new Map(),currentHair=null,ready=false,toastTimer=0;
+let anatomyMeshes=[],anatomySignature='',anatomySkinTexture=null;
+let mixer=null, motionClips=[], activeMotion='idle_breathe', currentAction=null, motionSpeed=1, motionPaused=false, frameClock=null, eyeLife=null, applyEyeMorphWeights=null, idleElapsed=0, idleNext=8+Math.random()*6, missingAgeMorphs=[];
+const SHAPE_KEYS=['shapeShoulders','shapeChest','shapeWaist','shapeHips','shapeArms','shapeLegs','shapeGlutes','shapeAbdomen','shapeCalves'];
+const shapeMorphParts=new WeakSet();
+const BODY_PRESETS={
+ balanced:{weight:0,muscle:0,proportions:0,shapeShoulders:0,shapeChest:0,shapeWaist:0,shapeHips:0,shapeArms:0,shapeLegs:0,shapeGlutes:0,shapeAbdomen:0,shapeCalves:0},
+ slim:{weight:-.55,muscle:-.18,proportions:-.35,shapeShoulders:-.12,shapeChest:-.12,shapeWaist:-.38,shapeHips:-.16,shapeArms:-.28,shapeLegs:-.24,shapeGlutes:-.25,shapeAbdomen:-.35,shapeCalves:-.12},
+ athletic:{weight:-.05,muscle:.58,proportions:.24,shapeShoulders:.32,shapeChest:.18,shapeWaist:-.24,shapeHips:-.03,shapeArms:.36,shapeLegs:.31,shapeGlutes:.15,shapeAbdomen:-.18,shapeCalves:.28},
+ sturdy:{weight:.48,muscle:.2,proportions:-.08,shapeShoulders:.12,shapeChest:.2,shapeWaist:.38,shapeHips:.25,shapeArms:.2,shapeLegs:.25,shapeGlutes:.3,shapeAbdomen:.25,shapeCalves:.2}
+};
+function effectiveHairColor(){if(!engine?.THREE||!state.naturalGray)return state.hairColor;const a=Math.max(0,Math.min(.58,((state.age-40)/20)*.58));return '#'+new engine.THREE.Color(state.hairColor).lerp(new engine.THREE.Color('#aeb1ad'),a).getHexString()}
+const tints=()=>({skin:state.skin,hair:effectiveHairColor(),brows:state.browColor||effectiveHairColor(),eyes:state.eyeColor,lashes:effectiveHairColor()});
+function toast(msg){const el=$('#toast');el.textContent=msg;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.style.display='none',2200)}
+function status(msg, error=false){const el=$('#status');el.textContent=msg;el.style.color=error?'#ffd0b6':'#f4d69a';if(error){$('#modelError').textContent=msg+' Revisá la conexión e intentá abrir el archivo otra vez.';$('#modelError').style.display='block'}}
+function fmtAge(){return `${state.age} ${state.age===1?'año':'años'}`}
+function updateHud(){
+ $('#displayName').textContent=state.name.trim()||'El Viajero';
+ $('#desc').textContent=`Humano · ${fmtAge()} · ${state.sex==='male'?'masculino':'femenino'}`;
+ $('#heightTag').textContent=`${(state.height/100).toFixed(2).replace('.',',')} m`;
+ $('#bodyTag').textContent=state.weight>.38?'Complexión robusta':state.weight<-.38?'Complexión delgada':state.muscle>.4?'Complexión atlética':'Complexión normal';
+}
+function sliderField(key,label,value,min=-1,max=1,step=.01,display=null,full=false){return `<div class="field ${full?'full':''}"><label class="fieldLabel" for="f-${key}"><span>${label}</span><b data-value-label="${key}">${display??Number(value).toFixed(2)}</b></label><input id="f-${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-key="${key}"></div>`}
+function selectField(key,label,items,value,full=false){return `<div class="field ${full?'full':''}"><label class="fieldLabel" for="f-${key}"><span>${label}</span></label><select id="f-${key}" data-key="${key}">${items.map(o=>`<option value="${o.value}" ${o.value===value?'selected':''} ${o.disabled?'disabled':''}>${o.label}</option>`).join('')}</select></div>`}
+const skinSwatches=[['Marfil','#f0c9aa'],['Canela','#c99a80'],['Bronce','#9b6448'],['Ébano','#674332'],['Oliva','#b58c68'],['Caoba','#794832'],['Dorado','#dfb38a'],['Marrón','#88563e'],['Oscuro','#493126'],['Piel clara','#e3bca1']];
+const hairSwatches=[['Negro','#1c1715'],['Castaño','#3b2a1e'],['Rubio','#c6a46b'],['Cobrizo','#9a4c2f'],['Gris','#9da0a2'],['Blanco','#d7d4cb'],['Azul noche','#252b43'],['Vino','#6f3040']];
+const eyeSwatches=[['Castaño','#4a2f19'],['Celeste','#689cb5'],['Verde','#526e50'],['Gris','#75828d'],['Avellana','#9a7546'],['Violeta','#75608d']];
+function palette(key,label,items){return `<div class="field full"><div class="fieldLabel"><span>${label}</span><b data-value-label="${key}">${state[key]}</b></div><div class="swatches">${items.map(([n,c])=>`<button type="button" class="swatch ${state[key].toLowerCase()===c.toLowerCase()?'active':''}" data-palette="${key}" data-value="${c}" aria-label="${label}: ${n}"><span class="chip" style="background:${c}"></span>${n}</button>`).join('')}</div><label class="fieldLabel" for="color-${key}"><span>Color personalizado</span></label><input id="color-${key}" type="color" value="${state[key]}" data-key="${key}"></div>`}
+
+const shapeSpecs=[
+ ['shapeShoulders',(x,y,z)=>{const g=gauss(y,1.41,.19)*smooth(Math.abs(x),.12,.31);return [x*.205*g,0,z*.075*g]}],
+ ['shapeChest',(x,y,z)=>{const g=gauss(y,1.245,.22)*smooth(Math.abs(x),.035,.29);return [x*.12*g,0,z*.15*g]}],
+ ['shapeWaist',(x,y,z)=>{const g=gauss(y,.965,.135)*smooth(Math.abs(x),.025,.28);return [x*.20*g,0,z*.16*g]}],
+ ['shapeHips',(x,y,z)=>{const g=gauss(y,.785,.17)*smooth(Math.abs(x),.035,.27);return [x*.17*g,0,z*.12*g]}],
+ ['shapeArms',(x,y,z)=>{const g=gauss(y,1.155,.31)*smooth(Math.abs(x),.205,.31);const c=(x<0?-1:1)*.325;return [(x-c)*.19*g,0,z*.17*g]}],
+ ['shapeLegs',(x,y,z)=>{const g=gauss(y,.49,.32)*smooth(Math.abs(x),.035,.105);const c=(x<0?-1:1)*.17;return [(x-c)*.2*g,0,z*.16*g]}],
+ // More localised forms. +Z is the character's front; glute volume moves the posterior surface (-Z).
+ ['shapeGlutes',(x,y,z)=>{const g=gauss(y,.755,.105)*smooth(Math.abs(x),.018,.235)*smooth(-z,.012,.145);const side=x<0?-1:1;return [side*.048*g,.006*g,-.105*g]}],
+ ['shapeAbdomen',(x,y,z)=>{const g=gauss(y,1.005,.13)*smooth(Math.abs(x),.012,.205)*smooth(z,.012,.16);return [x*.025*g,0,.068*g]}],
+ ['shapeCalves',(x,y,z)=>{const g=gauss(y,.385,.19)*smooth(Math.abs(x),.08,.205);const side=x<0?-1:1;return [side*.025*g,0,z*.045*g]}]
+];
+function gauss(v,c,w){const n=(v-c)/w;return Math.exp(-.5*n*n)}
+function smooth(v,a,b){const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)}
+function addPhysicalShapeMorphs(mesh){
+ if(!mesh?.isSkinnedMesh||shapeMorphParts.has(mesh))return;
+ const geo=mesh.geometry,pos=geo?.attributes?.position;if(!pos)return;
+ // Some base meshes ship without facial/body morph targets. Initialize the Three.js
+ // morph arrays instead of silently disabling every additional body-shape control.
+ if((!mesh.morphTargetInfluences||!mesh.morphTargetDictionary)&&typeof mesh.updateMorphTargets==='function')mesh.updateMorphTargets();
+ mesh.morphTargetDictionary??={};mesh.morphTargetInfluences??=[];
+ geo.morphAttributes.position??=[];geo.morphAttributes.normal??=[];
+ const currentPosCount=geo.morphAttributes.position.length;
+ while(mesh.morphTargetInfluences.length<currentPosCount)mesh.morphTargetInfluences.push(0);
+ // Keep position/normal morph indices aligned for Three.js.
+ while(geo.morphAttributes.normal.length<currentPosCount)geo.morphAttributes.normal.push(new engine.THREE.Float32BufferAttribute(new Float32Array(pos.array.length),3));
+ const base=pos.array,baseNormals=geo.attributes.normal?.array||new Float32Array(base.length);
+ for(const [key,displace] of shapeSpecs){
+  const delta=new Float32Array(base.length);
+  for(let i=0;i<base.length;i+=3){const d=displace(base[i],base[i+1],base[i+2]);delta[i]=d[0];delta[i+1]=d[1];delta[i+2]=d[2]}
+  // Compute a matching normal delta once, at asset load, to keep broad shapes lit smoothly while dragging sliders.
+  const targetPos=new Float32Array(base.length);for(let i=0;i<base.length;i++)targetPos[i]=base[i]+delta[i];
+  const temp=new engine.THREE.BufferGeometry();temp.setAttribute('position',new engine.THREE.BufferAttribute(targetPos,3));if(geo.index)temp.setIndex(geo.index.clone());temp.computeVertexNormals();
+  const targetNormals=temp.attributes.normal.array,normalDelta=new Float32Array(base.length);for(let i=0;i<base.length;i++)normalDelta[i]=targetNormals[i]-baseNormals[i];temp.dispose();
+  const index=geo.morphAttributes.position.length;geo.morphAttributes.position.push(new engine.THREE.Float32BufferAttribute(delta,3));geo.morphAttributes.normal.push(new engine.THREE.Float32BufferAttribute(normalDelta,3));
+  geo.morphAttributes.position[index].name=key;geo.morphAttributes.normal[index].name=key;
+  mesh.morphTargetDictionary[key]=index;mesh.morphTargetInfluences.push(0);
+ }
+ geo.morphTargetsRelative=true;shapeMorphParts.add(mesh);
+}
+function applyShapeMorphs(mesh){if(!mesh?.morphTargetDictionary||!mesh.morphTargetInfluences)return;for(const k of SHAPE_KEYS){const i=mesh.morphTargetDictionary[k];if(i!==undefined)mesh.morphTargetInfluences[i]=state[k]||0}}
+
+// V9: procedural anatomy and texture generated inside this HTML; no additional model download.
+function makeAnatomyBuilder(){return {positions:[],uvs:[],indices:[]}}
+function addAnatomyVertex(b,x,y,z,u=0,v=0){const i=b.positions.length/3;b.positions.push(x,y,z);b.uvs.push(u,v);return i}
+function addAnatomyEllipsoid(b,c,r,segments=28,rings=18,rotX=0){
+ const start=b.positions.length/3,cs=Math.cos(rotX),sn=Math.sin(rotX);
+ for(let j=0;j<=rings;j++){
+  const v=j/rings,phi=v*Math.PI,sp=Math.sin(phi),cp=Math.cos(phi);
+  for(let i=0;i<=segments;i++){
+   const u=i/segments,theta=u*Math.PI*2,lx=r[0]*sp*Math.cos(theta),ly=r[1]*cp,lz=r[2]*sp*Math.sin(theta);
+   const y=ly*cs-lz*sn,z=ly*sn+lz*cs;
+   addAnatomyVertex(b,c[0]+lx,c[1]+y,c[2]+z,u,1-v);
+  }
+ }
+ const row=segments+1;
+ for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){
+  const a=start+j*row+i,bb=a+1,d=a+row,c=d+1;
+  b.indices.push(a,bb,c,a,c,d);
+ }
+}
+// A continuous, gently tapered shaft. The axis changes by state: downward/forward
+// when flaccid; longer and slightly raised when erect. The end is finished by a
+// separate oriented glans mesh, not by a floating sphere on a straight cylinder.
+function addAnatomyTube(b,start,length,rx,ry,shape,erect=false){
+ const around=28,steps=22,base=b.positions.length/3;
+ const angle=erect?.27:-.63,dy=Math.sin(angle),dz=Math.cos(angle);
+ for(let j=0;j<=steps;j++){
+  const t=j/steps;
+  const smoothStart=.86+.14*Math.min(1,t*7),bulb=1+.10*Math.exp(-Math.pow((t-.82)/.13,2));
+  const profile=smoothStart*bulb*(1-.12*t),bend=shape*.009*Math.sin(Math.PI*t);
+  const cx=start[0]+bend,cy=start[1]+dy*length*t+shape*.004*Math.sin(Math.PI*t),cz=start[2]+dz*length*t;
+  for(let i=0;i<=around;i++){
+   const u=i/around,a=u*Math.PI*2,x=Math.cos(a)*rx*profile,y=Math.sin(a)*ry*profile;
+   addAnatomyVertex(b,cx+x,cy+y*dz,cz-y*dy,u,t);
+  }
+ }
+ const row=around+1;
+ for(let j=0;j<steps;j++)for(let i=0;i<around;i++){
+  const a=base+j*row+i,bb=a+1,d=a+row,c=d+1;
+  b.indices.push(a,d,c,a,c,bb);
+ }
+ return {angle,dy,dz,end:[start[0]+shape*.001,start[1]+dy*length,start[2]+dz*length]};
+}
+
+function anatomyTexture(){
+ if(anatomySkinTexture||!engine?.THREE)return anatomySkinTexture;
+ const T=engine.THREE,canvas=document.createElement('canvas');canvas.width=canvas.height=512;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return null;
+ // Soft warm undertone with broad mottling and fine grain, generated locally.
+ const grad=ctx.createRadialGradient(250,240,16,256,256,330);
+ grad.addColorStop(0,'#fffaf7');grad.addColorStop(.55,'#f3e3df');grad.addColorStop(1,'#dfc8c4');ctx.fillStyle=grad;ctx.fillRect(0,0,512,512);
+ let seed=81723;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+ const img=ctx.getImageData(0,0,512,512);
+ for(let y=0;y<512;y++)for(let x=0;x<512;x++){
+  const i=(y*512+x)*4,n=(rand()-.5)*18,cloud=(Math.sin(x*.021+Math.sin(y*.013)*2)+Math.sin(y*.017+x*.009)) * 2.2;
+  img.data[i]=Math.max(0,Math.min(255,img.data[i]+n+cloud));
+  img.data[i+1]=Math.max(0,Math.min(255,img.data[i+1]+n*.68+cloud*.6));
+  img.data[i+2]=Math.max(0,Math.min(255,img.data[i+2]+n*.62+cloud*.4));
+ }
+ ctx.putImageData(img,0,0);
+ for(let i=0;i<1150;i++){
+  const x=rand()*512,y=rand()*512,r=.25+rand()*1.25,a=.018+rand()*.055;
+  ctx.fillStyle=rand()>.55?`rgba(119,65,57,${a})`:`rgba(255,248,240,${a})`;
+  ctx.beginPath();ctx.ellipse(x,y,r,r*(.45+rand()),rand()*Math.PI,0,Math.PI*2);ctx.fill();
+ }
+ for(let i=0;i<14;i++){
+  const x=rand()*512,y=rand()*512,w=8+rand()*26,h=.6+rand()*1.1;
+  ctx.strokeStyle=`rgba(130,75,68,${.035+rand()*.04})`;ctx.lineWidth=h;ctx.beginPath();ctx.moveTo(x,y);ctx.bezierCurveTo(x+w*.3,y-2,x+w*.65,y+2,x+w,y+(rand()-.5)*3);ctx.stroke();
+ }
+ anatomySkinTexture=new T.CanvasTexture(canvas);anatomySkinTexture.colorSpace=T.SRGBColorSpace;anatomySkinTexture.wrapS=T.RepeatWrapping;anatomySkinTexture.wrapT=T.RepeatWrapping;anatomySkinTexture.anisotropy=Math.min(4,renderer?.capabilities?.getMaxAnisotropy?.()||1);anatomySkinTexture.needsUpdate=true;return anatomySkinTexture;
+}
+
+function anatomyCoveringBottom(){
+ const worn=clothing?.worn?.()||[],items=clothingCatalog?.items||[];
+ const blockedIds=new Set(['jeans','shorts','skirt','dress','briefs','panties','trenchcoat']);
+ return worn.some(id=>{const it=items.find(x=>x.id===id);return blockedIds.has(id)||['bottom','underwear','dress'].includes(String(it?.slot||'').toLowerCase())});
+}
+function makeAnatomySkinnedMesh(builder,material,name){
+ if(!builder.indices.length)return null;
+ const T=engine.THREE,geo=new T.BufferGeometry(),positions=Float32Array.from(builder.positions),count=positions.length/3;
+ geo.setAttribute('position',new T.BufferAttribute(positions,3));geo.setAttribute('uv',new T.Float32BufferAttribute(builder.uvs,2));geo.setIndex(builder.indices);geo.computeVertexNormals();
+ const hipsIndex=Math.max(0,body.skeleton.bones.findIndex(b=>/^(hips|pelvis)$/i.test(b.name)));
+ const ji=new Uint16Array(count*4),jw=new Float32Array(count*4);
+ for(let i=0;i<count;i++){ji[i*4]=hipsIndex;jw[i*4]=1;}
+ geo.setAttribute('skinIndex',new T.Uint16BufferAttribute(ji,4));geo.setAttribute('skinWeight',new T.Float32BufferAttribute(jw,4));
+ const mesh=new T.SkinnedMesh(geo,material);mesh.name=name;mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=3;
+ mesh.position.copy(body.position);mesh.quaternion.copy(body.quaternion);mesh.scale.copy(body.scale);
+ (body.parent||modelRoot).add(mesh);mesh.bind(body.skeleton,body.bindMatrix);return mesh;
+}
+function buildAnatomyMeshes(){
+ const T=engine.THREE,skin=makeAnatomyBuilder(),detail=makeAnatomyBuilder(),hair=makeAnatomyBuilder();
+ const pos=body.geometry.attributes.position.array;
+ modelRoot.updateMatrixWorld(true);body.updateWorldMatrix(true,false);
+ const localBone=(re)=>{const b=body.skeleton.bones.find(x=>re.test(x.name));if(!b)return null;const q=b.getWorldPosition(new T.Vector3());return body.worldToLocal(q)};
+ const hips=localBone(/^(hips|pelvis)$/i),left=localBone(/^leftupleg$/i)||localBone(/^upperleg.*\.L$/i),right=localBone(/^rightupleg$/i)||localBone(/^upperleg.*\.R$/i);
+ const cx=left&&right?(left.x+right.x)/2:(hips?.x||0),hy=hips?.y??.86;
+ const size=Math.max(.55,Math.min(1.55,Number(state.genitalSize)||1)),shape=Math.max(-1,Math.min(1,Number(state.genitalShape)||0));
+ const cy=(left&&right?((left.y+right.y)/2-.025):hy-.155)+(state.shapeHips||0)*.006+(state.shapeLegs||0)*.003;
+ let front=-Infinity;
+ for(let i=0;i<pos.length;i+=3){const x=pos[i],y=pos[i+1],z=pos[i+2];if(Math.abs(x-cx)<.14&&Math.abs(y-cy)<.105)front=Math.max(front,z)}
+ if(!Number.isFinite(front))front=.07;
+ front+=.007+Math.max(-.02,Math.min(.04,Number(state.genitalOffset)||0));
+ const type=state.genitalType==='auto'?state.sex:state.genitalType;
+ // Shared lower-abdominal mound, smoothly integrated with the pelvis.
+ addAnatomyEllipsoid(skin,[cx,cy+.036,front-.030],[.074*size,.066*size,.033*size],32,20);
+ if(type==='male'){
+  // Scrotal sac plus two anatomically grouped testes; soft, asymmetric silhouettes avoid the old bead-like look.
+  addAnatomyEllipsoid(skin,[cx,cy-.059,front+.009],[.041*size,.043*size,.032*size],28,18);
+  addAnatomyEllipsoid(skin,[cx-.019*size,cy-.073,front+.028],[.0175*size,.021*size,.018*size],24,16);
+  addAnatomyEllipsoid(skin,[cx+.019*size,cy-.073,front+.028],[.0175*size,.021*size,.018*size],24,16);
+  const erect=state.genitalState==='erect';
+  const length=(erect?.158:.107)*(1+Math.max(0,shape)*.12)*size;
+  const radX=(.0165+shape*.0038)*size,radY=(.016+shape*.0035)*size;
+  const shaftStart=[cx,cy-(erect?.019:.036),front+.026];
+  const axis=addAnatomyTube(skin,shaftStart,length,radX,radY,shape,erect);
+  addAnatomyEllipsoid(skin,[axis.end[0],axis.end[1],axis.end[2]],[.0185*size,.0168*size,.026*size],28,18,-axis.angle);
+  addAnatomyEllipsoid(detail,[axis.end[0],axis.end[1],axis.end[2]+axis.dz*.005],[.0115*size,.0107*size,.015*size],24,16,-axis.angle);
+  const ringCenter=[cx,shaftStart[1]+axis.dy*length*.79,shaftStart[2]+axis.dz*length*.79];
+  addAnatomyEllipsoid(detail,ringCenter,[.0177*size,.0170*size,.0045*size],28,14,-axis.angle);
+ }else{
+  // Layered labia majora/minora with a narrow central cleft and a small clitoral hood.
+  addAnatomyEllipsoid(skin,[cx-.026*size,cy-.033,front+.012],[.025*size,.050*size,.020*size],28,18);
+  addAnatomyEllipsoid(skin,[cx+.026*size,cy-.033,front+.012],[.025*size,.050*size,.020*size],28,18);
+  addAnatomyEllipsoid(detail,[cx-.0105*size,cy-.030,front+.029],[.0092*size,.038*size,.0095*size],24,16);
+  addAnatomyEllipsoid(detail,[cx+.0105*size,cy-.030,front+.029],[.0092*size,.038*size,.0095*size],24,16);
+  addAnatomyEllipsoid(detail,[cx,cy+.009,front+.031],[.008*size,.010*size,.006*size],20,14);
+  addAnatomyEllipsoid(skin,[cx,cy-.073,front+.005],[.039*size,.030*size,.025*size],24,16);
+ }
+ if(state.pubicHair&&state.pubicHairAmount>.005){
+  let seed=92371;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const count=Math.round(Math.max(0,Math.min(1,Number(state.pubicHairAmount)||0))*190),rx=.071*size,ry=.050*size;
+  const hairLength=Math.max(.3,Math.min(1.8,Number(state.pubicHairLength)||1));
+  for(let n=0;n<count;n++){
+   const x=(random()*2-1)*rx,y=cy+.042-random()*ry*1.45,nx=x/rx,ny=(y-(cy+.003))/ry;
+   if(nx*nx+ny*ny>1)continue;
+   const surface=front+.012+.019*Math.sqrt(Math.max(0,1-Math.min(1,nx*nx+ny*ny))),len=(.014+random()*.029)*hairLength;
+   const dx=(random()-.5)*.013,width=.0007+random()*.0008,z=surface+.001;
+   const base=hair.positions.length/3,steps=4;
+   for(let j=0;j<=steps;j++){
+    const t=j/steps,xx=cx+x+dx*t*t,yy=y-len*t,zz=z+.0035*Math.sin(Math.PI*t);
+    addAnatomyVertex(hair,xx-width*(1-.83*t),yy,zz,0,t);addAnatomyVertex(hair,xx+width*(1-.83*t),yy,zz+.00055,1,t);
+   }
+   for(let j=0;j<steps;j++){const a=base+j*2,b=a+1,c=a+3,d=a+2;hair.indices.push(a,d,c,a,c,b)}
+  }
+ }
+ const skinMat=new T.MeshPhysicalMaterial({name:'AnatomySkin',color:state.genitalSkin,map:anatomyTexture(),roughness:.66,metalness:0,sheen:.13,sheenRoughness:.85,clearcoat:.035,clearcoatRoughness:.78,side:T.DoubleSide});
+ const detailMat=new T.MeshPhysicalMaterial({name:'AnatomyDetail',color:state.genitalDetailColor,roughness:.61,metalness:0,sheen:.12,sheenRoughness:.82,side:T.DoubleSide});
+ const hairMat=new T.MeshStandardMaterial({name:'PubicHair',color:state.pubicHairColor,roughness:.94,metalness:0,side:T.DoubleSide});
+ return [makeAnatomySkinnedMesh(skin,skinMat,'Anatomy_Skin'),makeAnatomySkinnedMesh(detail,detailMat,'Anatomy_Detail'),makeAnatomySkinnedMesh(hair,hairMat,'Anatomy_PubicHair')].filter(Boolean);
+}
+
+function updateAnatomyMeshes(){
+ if(!ready||!body||!engine)return;
+ if(!state.showAnatomy){removeAnatomyMeshes();anatomySignature='';return;}
+ const signature=[state.sex,state.genitalType,state.genitalState,state.genitalSize,state.genitalShape,state.genitalOffset,state.genitalSkin,state.genitalDetailColor,state.pubicHair,state.pubicHairAmount,state.pubicHairLength,state.pubicHairColor,state.shapeHips,state.shapeLegs].join('|');
+ if(signature!==anatomySignature){removeAnatomyMeshes();anatomyMeshes=buildAnatomyMeshes();anatomySignature=signature;}
+ const visible=!anatomyCoveringBottom();for(const m of anatomyMeshes)m.visible=visible;
+}
+function removeAnatomyMeshes(){for(const m of anatomyMeshes){m.removeFromParent();m.geometry?.dispose();if(Array.isArray(m.material))m.material.forEach(x=>x.dispose());else m.material?.dispose()}anatomyMeshes=[];}
+
+const browBaseData=new WeakMap();
+function applyBrowControls(root){
+ if(!root||!engine)return;
+ root.traverse(o=>{
+  if(!o.isMesh||!o.geometry?.attributes?.position)return;
+  const mats=[].concat(o.material||[]),hasBrowMaterial=mats.some(m=>m&&engine.materialRole(m.name)==='brows');
+  if(!/brow|eyebrow|ceja/i.test(o.name||'')&&!hasBrowMaterial)return;
+  const geo=o.geometry,attr=geo.attributes.position;
+  if(!browBaseData.has(o)){
+   geo.computeBoundingBox();const bb=geo.boundingBox;
+   browBaseData.set(o,{positions:attr.array.slice(),center:[(bb.min.x+bb.max.x)/2,(bb.min.y+bb.max.y)/2,(bb.min.z+bb.max.z)/2],height:bb.max.y-bb.min.y,scale:o.scale.clone(),position:o.position.clone(),rotation:o.rotation.clone()});
+  }
+  const base=browBaseData.get(o),arr=base.positions,thick=Math.max(.55,Math.min(1.45,1+Number(state.browThickness||0)*.45)),height=Number(state.browHeight||0)*.014,spacing=Number(state.browSpacing||0)*.010,angle=Number(state.browAngle||0)*.18;
+  for(let i=0;i<arr.length;i+=3){
+   const dx=arr[i]-base.center[0],dy=arr[i+1]-base.center[1];
+   const side=Math.abs(base.center[0])>.002?Math.sign(base.center[0]):Math.sign(dx);
+   attr.array[i]=arr[i]+side*spacing;
+   attr.array[i+1]=base.center[1]+dy*thick+height+dx*angle;
+   attr.array[i+2]=arr[i+2];
+  }
+  attr.needsUpdate=true;geo.computeVertexNormals();geo.computeBoundingSphere();
+ });
+}
+function setCameraView(view){if(!camera||!controls)return;let target=new engine.THREE.Vector3(0,.9,0),pos=new engine.THREE.Vector3(0,1.02,2.98);if(view==='face'){const head=body?.skeleton?.bones.find(b=>b.name.toLowerCase()==='head');if(head){target=head.getWorldPosition(new engine.THREE.Vector3());target.y+=.035}pos=target.clone().add(new engine.THREE.Vector3(0,.04,.72))}else if(view==='side'){target.set(0,.9,0);pos.set(2.65,1,0)}else if(view==='anatomy'){const hip=body?.skeleton?.bones.find(b=>/^(hips|pelvis)$/i.test(b.name));if(hip){target=hip.getWorldPosition(new engine.THREE.Vector3());target.y-=.17}else target.set(0,.72,0);pos=target.clone().add(new engine.THREE.Vector3(0,.035,.72))}camera.position.copy(pos);controls.target.copy(target);controls.update()}
+const motionAliases={idle_breathe:['idle_breathe','idlebreath','breathing'],idle_look:['idle_look','idlelook'],idle_fidget:['idle_fidget','idlefidget'],walk:['walk'],run:['run'],jump:['jump'],walk_back:['walk_back','walkback'],strafe_left:['strafe_left','strafleft'],strafe_right:['strafe_right','straferight']};
+function normalMotionName(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
+function playMotion(name){
+ if(!['idle_breathe','idle_look','idle_fidget'].includes(name)){idleElapsed=0;idleNext=8+Math.random()*6;}else if(name!==activeMotion){idleElapsed=0;idleNext=8+Math.random()*6;}
+ if(!mixer||!motionClips.length){toast('Las animaciones todavía no están disponibles');return}
+ const keys=motionAliases[name]||[name],clip=motionClips.find(c=>keys.includes(normalMotionName(c.name)))||motionClips.find(c=>normalMotionName(c.name).includes(normalMotionName(name)));
+ if(!clip){toast('Esta animación no está incluida en el modelo');return}
+ const oneShot=['jump','land'].includes(name);if(currentAction)currentAction.fadeOut(.22);
+ const action=mixer.clipAction(clip,modelRoot);currentAction=action;action.reset();action.enabled=true;action.clampWhenFinished=oneShot;action.setLoop(oneShot?engine.THREE.LoopOnce:engine.THREE.LoopRepeat,oneShot?1:Infinity);action.fadeIn(.22).play();action.setEffectiveTimeScale(motionSpeed);mixer.timeScale=motionPaused?0:motionSpeed;activeMotion=name;motionPaused=false;
+ if(oneShot){const onFinish=(ev)=>{if(ev.action===action){mixer.removeEventListener('finished',onFinish);playMotion('idle_breathe')}};mixer.addEventListener('finished',onFinish)}
+ const lab=$(`[data-motion="${name}"]`);if(lab){panel.querySelectorAll('[data-motion]').forEach(b=>b.classList.toggle('active',b===lab))}
+}
+
+function outfitSelect(slot,label){
+ const items=(clothingCatalog?.items||[]).filter(i=>i.slot===slot&&(!i.sex||i.sex===state.sex||i.sex==='*'));
+ if(!items.length)return '';
+ const worn=clothing?.worn?.()||[];const selected=items.find(i=>worn.includes(i.id))?.id||'';
+ const nameMap={tshirt:'Camiseta',shirt:'Camisa de manga larga',hoodie:'Buzo con capucha',jacket:'Chaqueta',dress:'Vestido',trenchcoat:'Abrigo largo',jeans:'Jeans',shorts:'Pantalón corto',skirt:'Falda',shoes:'Zapatos',boots:'Botas',briefs:'Ropa interior',panties:'Ropa interior',bra:'Sujetador'};
+ return `<div class="field full"><label class="fieldLabel" for="wear-${slot}"><span>${label}</span></label><select id="wear-${slot}" data-wear-slot="${slot}"><option value="" ${!selected?'selected':''}>Quitar esta prenda</option>${items.map(i=>`<option value="${i.id}" ${i.id===selected?'selected':''}>${nameMap[i.id]||i.label?.en||i.id}</option>`).join('')}</select></div>`;
+}
+function renderPanel(){
+ let html='';
+ if(currentTab==='body'){
+  const heightVal=state.height;
+  html=`<div class="panelTitle"><strong>Rasgos y proporciones</strong><small>Edad y cuerpo reales<br>mediante morphs 3D</small></div>
+   <div class="formGrid">
+    <div class="field full"><label class="fieldLabel" for="f-name"><span>Nombre del personaje</span></label><input id="f-name" type="text" maxlength="32" value="${escapeHtml(state.name)}" data-key="name" placeholder="Nombre del personaje"></div>
+    ${selectField('sex','Género corporal',[{value:'male',label:'Masculino'},{value:'female',label:'Femenino'}],state.sex)}
+    ${sliderField('age','Edad aparente',state.age,10,60,1,fmtAge())}
+    ${sliderField('height','Estatura',heightVal,150,200,1,`${state.height} cm`)}
+    ${sliderField('weight','Complexión',Math.round((state.weight+1)*50),0,100,1,state.weight<-.3?'Delgada':state.weight>.3?'Robusta':'Media')}
+    ${sliderField('muscle','Musculatura',Math.round((state.muscle+1)*50),0,100,1,state.muscle<-.3?'Baja':state.muscle>.3?'Alta':'Media')}
+    ${sliderField('proportions','Proporciones generales',Math.round((state.proportions+1)*50),0,100,1,state.proportions<-.3?'Estilizadas':state.proportions>.3?'Marcadas':'Neutrales',true)}
+    ${palette('skin','Tono de piel',skinSwatches)}
+   </div>
+   <div class="microLabel">Distribución corporal · morphs adicionales</div>
+   <div class="formGrid">
+    ${sliderField('shapeShoulders','Anchura de hombros',Math.round((state.shapeShoulders+1)*50),0,100,1,Math.round((state.shapeShoulders+1)*50)+'%',true)}
+    ${sliderField('shapeChest','Volumen del torso',Math.round((state.shapeChest+1)*50),0,100,1,Math.round((state.shapeChest+1)*50)+'%',true)}
+    ${sliderField('shapeWaist','Anchura de cintura',Math.round((state.shapeWaist+1)*50),0,100,1,Math.round((state.shapeWaist+1)*50)+'%',true)}
+    ${sliderField('shapeHips','Anchura de caderas',Math.round((state.shapeHips+1)*50),0,100,1,Math.round((state.shapeHips+1)*50)+'%',true)}
+    ${sliderField('shapeArms','Volumen de brazos',Math.round((state.shapeArms+1)*50),0,100,1,Math.round((state.shapeArms+1)*50)+'%',true)}
+    ${sliderField('shapeLegs','Volumen de piernas',Math.round((state.shapeLegs+1)*50),0,100,1,Math.round((state.shapeLegs+1)*50)+'%',true)}
+    ${sliderField('shapeGlutes','Volumen de glúteos',Math.round((state.shapeGlutes+1)*50),0,100,1,Math.round((state.shapeGlutes+1)*50)+'%',true)}
+    ${sliderField('shapeAbdomen','Volumen del abdomen',Math.round((state.shapeAbdomen+1)*50),0,100,1,Math.round((state.shapeAbdomen+1)*50)+'%',true)}
+    ${sliderField('shapeCalves','Volumen de pantorrillas',Math.round((state.shapeCalves+1)*50),0,100,1,Math.round((state.shapeCalves+1)*50)+'%',true)}
+   </div>
+   <div class="presetRow"><button class="choice ${state.bodyPreset==='slim'?'active':''}" data-body-preset="slim">Delgado</button><button class="choice ${state.bodyPreset==='balanced'?'active':''}" data-body-preset="balanced">Equilibrado</button><button class="choice ${state.bodyPreset==='athletic'?'active':''}" data-body-preset="athletic">Atlético</button></div>
+   ${state.sex==='female'?`<div class="microLabel">Pecho · forma y posición</div><div class="formGrid">${sliderField('breastSize','Volumen',Math.round(state.breastSize*100),0,100,1,Math.round(state.breastSize*100)+'%',true)}${sliderField('breastFirmness','Firmeza',Math.round(state.breastFirmness*100),0,100,1,Math.round(state.breastFirmness*100)+'%',true)}${sliderField('breastHeight','Posición',Math.round((state.breastHeight+1)*50),0,100,1,Math.round((state.breastHeight+1)*50)+'%',true)}${sliderField('breastSpacing','Separación',Math.round((state.breastSpacing+1)*50),0,100,1,Math.round((state.breastSpacing+1)*50)+'%',true)}${sliderField('breastProjection','Proyección',Math.round((state.breastProjection+1)*50),0,100,1,Math.round((state.breastProjection+1)*50)+'%',true)}</div>`:''}
+   <div class="note">Los controles de distribución modifican la geometría base del cuerpo y se mantienen al cambiar prendas. El resultado depende de cómo venga construido y ponderado el modelo 3D original.</div>`;
+ }else if(currentTab==='face'){
+  html=`<div class="panelTitle"><strong>Rostro</strong><small>Formas faciales<br>en el modelo base</small></div>
+   <div class="formGrid">${sliderField('noseWidth','Ancho de nariz',state.noseWidth,-1,1,.01,Number(state.noseWidth).toFixed(2))}${sliderField('noseLength','Largo de nariz',state.noseLength,-1,1,.01,Number(state.noseLength).toFixed(2))}${sliderField('noseHeight','Altura de nariz',state.noseHeight,-1,1,.01,Number(state.noseHeight).toFixed(2))}${sliderField('jawWidth','Ancho de mandíbula',state.jawWidth,-1,1,.01,Number(state.jawWidth).toFixed(2))}${sliderField('chin','Forma de mentón',state.chin,-1,1,.01,Number(state.chin).toFixed(2))}${sliderField('cheekbones','Pómulos',state.cheekbones,-1,1,.01,Number(state.cheekbones).toFixed(2))}${sliderField('eyeSize','Tamaño de ojos',state.eyeSize,-1,1,.01,Number(state.eyeSize).toFixed(2))}${sliderField('eyeSpacing','Separación de ojos',state.eyeSpacing,-1,1,.01,Number(state.eyeSpacing).toFixed(2))}${sliderField('eyeTilt','Inclinación de ojos',state.eyeTilt,-1,1,.01,Number(state.eyeTilt).toFixed(2))}${sliderField('lips','Volumen de labios',state.lips,-1,1,.01,Number(state.lips).toFixed(2))}${sliderField('mouthWidth','Ancho de boca',state.mouthWidth,-1,1,.01,Number(state.mouthWidth).toFixed(2))}${sliderField('forehead','Altura de frente',state.forehead,-1,1,.01,Number(state.forehead).toFixed(2))}${sliderField('earSize','Tamaño de orejas',state.earSize,-1,1,.01,Number(state.earSize).toFixed(2))}${sliderField('browThickness','Grosor de cejas',state.browThickness,-1,1,.01,Number(state.browThickness).toFixed(2))}${sliderField('browHeight','Altura de cejas',state.browHeight,-1,1,.01,Number(state.browHeight).toFixed(2))}${sliderField('browAngle','Inclinación de cejas',state.browAngle,-1,1,.01,Number(state.browAngle).toFixed(2))}${sliderField('browSpacing','Separación de cejas',state.browSpacing,-1,1,.01,Number(state.browSpacing).toFixed(2))}${palette('browColor','Color de cejas',hairSwatches)}${palette('eyeColor','Color de ojos',eyeSwatches)}</div>
+   <div class="note warning">La base 3D incluye cambios faciales reales, pero no incluye una malla de barba independiente. No activé una barba falsa hecha con una esfera que se pegue a la cara.</div>`;
+ }else if(currentTab==='hair'){
+  const hairstyles=[{value:'short02',label:'Corto clásico'},{value:'short04',label:'Corto peinado'},{value:'bob02',label:'Bob'},{value:'bob01',label:'Bob largo'},{value:'long01',label:'Largo'},{value:'ponytail01',label:'Cola de caballo'},{value:'braid01',label:'Trenza'},{value:'afro01',label:'Afro'},{value:'none',label:'Sin cabello'}];
+  html=`<div class="panelTitle"><strong>Cabello</strong><small>Peinados 3D</small></div><div class="formGrid">${selectField('hair','Peinado',hairstyles,state.hair,true)}${palette('hairColor','Color de cabello',hairSwatches)}</div>
+  <button type="button" class="choice ${state.naturalGray?'active':''}" style="width:100%;margin-top:8px" data-natural-grey>Canas naturales por edad · ${state.naturalGray?'Activadas':'Desactivadas'}</button>`;
+ }else if(currentTab==='clothes'){
+  const wornIds=clothing?.worn?.()||[];
+  const wearable=wornIds.filter(id=>{const it=clothingCatalog?.items.find(x=>x.id===id);return it&&it.slot!=='underwear'&&it.slot!=='bra'});
+  if(!wearable.includes(state.selectedClothId))state.selectedClothId=wearable[0]||'';
+  const colorState=clothing?.state?.().colors?.[state.selectedClothId];
+  const garmentOptions=wearable.map(id=>{const it=clothingCatalog.items.find(x=>x.id===id);return {value:id,label:({tshirt:'Camiseta',shirt:'Camisa de manga larga',hoodie:'Buzo',jacket:'Chaqueta',dress:'Vestido',trenchcoat:'Abrigo largo',jeans:'Jeans',shorts:'Pantalón corto',skirt:'Falda',shoes:'Zapatos',boots:'Botas'}[id]||it?.label?.en||id)}});
+  html=`<div class="panelTitle"><strong>Vestuario</strong><small>Quitá y poné cada capa</small></div>
+   <div class="microLabel">Piezas equipadas</div>
+   <div class="formGrid">${outfitSelect('top','Parte superior')}${outfitSelect('bottom','Pantalón o falda')}${outfitSelect('shoes','Calzado')}${outfitSelect('outerwear','Abrigo / capa')}${outfitSelect('underwear','Ropa interior')}${outfitSelect('bra','Sujetador')}</div>
+   <div class="microLabel">Conjuntos rápidos</div><div class="presetRow"><button class="choice" data-outfit-preset="adventurer">Aventurero</button><button class="choice" data-outfit-preset="traveler">Viajero</button></div>
+   <hr class="divider"><div class="microLabel">Color de la prenda elegida</div>
+   ${selectField('selectedClothId','Prenda',garmentOptions,state.selectedClothId,true)}
+   <div class="formGrid"><div class="field"><label class="fieldLabel" for="clothingColor"><span>Color principal</span></label><input type="color" id="clothingColor" value="${colorState?.primary||'#536b95'}" data-key="clothingColor" ${state.selectedClothId&&colorState?'':'disabled'}></div><div class="field"><label class="fieldLabel" for="clothingSecondary"><span>Detalles</span></label><input type="color" id="clothingSecondary" value="${colorState?.secondary||'#d7c39b'}" data-key="clothingSecondary" ${state.selectedClothId&&colorState?.secondary?'':'disabled'}></div></div>
+   <div class="note">Las prendas se ponen y se quitan de forma independiente. La anatomía íntima no está modelada todavía en este archivo base; no se simula con primitivas para evitar añadir una pieza que se vea falsa.</div>`;
+ }else if(currentTab==='motion'){
+  const clipsReady=motionClips.length>0;
+  html=`<div class="panelTitle"><strong>Movimiento y poses</strong><small>${clipsReady?'Animaciones del modelo':'Cargando clips de animación'}</small></div>
+   <div class="microLabel">Elegí una animación</div><div class="motionGrid">
+    ${[['idle_breathe','Respirar','♧'],['idle_look','Mirar alrededor','◉'],['idle_fidget','Moverse','↻'],['walk','Caminar','➜'],['run','Correr','»'],['jump','Saltar','↑'],['walk_back','Retroceder','↶'],['strafe_left','Paso izquierdo','←'],['strafe_right','Paso derecho','→']].map(([id,label,glyph])=>`<button class="motionBtn ${activeMotion===id?'active':''}" data-motion="${id}" ${clipsReady?'':'disabled'}><span class="glyph">${glyph}</span><span>${label}</span></button>`).join('')}
+   </div>
+   <div class="field full"><label class="fieldLabel" for="motionSpeed"><span>Velocidad de animación</span><b id="motionSpeedValue">${motionSpeed.toFixed(2)}×</b></label><input id="motionSpeed" type="range" min="0.35" max="1.8" step="0.05" value="${motionSpeed}" data-motion-speed ${clipsReady?'':'disabled'}><button class="choice" style="width:100%;margin-top:5px" data-motion-toggle ${clipsReady?'':'disabled'}>${motionPaused?'▶ Reanudar movimiento':'Ⅱ Pausar movimiento'}</button></div>
+   <div class="microLabel">Enfoque de cámara</div><div class="viewButtons"><button class="choice" data-view="full">Cuerpo entero</button><button class="choice" data-view="face">Primer plano</button><button class="choice" data-view="side">Perfil</button></div>
+   <div class="note ${clipsReady?'':'warning'}">${clipsReady?'Clips detectados: '+motionClips.map(c=>c.name).join(', '):'El archivo de animaciones aún no terminó de cargar. Los controles permanecerán desactivados hasta que esté disponible.'}</div>`;
+ }else if(currentTab==='anatomy'){
+  html=`<div class="panelTitle"><strong>Malla anatómica</strong><small>Geometría 3D procedural</small></div>
+   <div class="formGrid">
+    ${selectField('showAnatomy','Mostrar malla',[{value:'true',label:'Visible'},{value:'false',label:'Oculta'}],String(state.showAnatomy),true)}
+    ${selectField('genitalType','Anatomía',[{value:'auto',label:'Según género'},{value:'male',label:'Masculina'},{value:'female',label:'Femenina'}],state.genitalType,true)}
+    ${selectField('genitalState','Estado',[{value:'flaccid',label:'Flácido'},{value:'erect',label:'Erecto'}],state.genitalState,true)}
+    ${sliderField('genitalSize','Tamaño',state.genitalSize,.65,1.5,.01,Math.round(state.genitalSize*100)+'%',true)}
+    ${sliderField('genitalShape','Grosor y curvatura',state.genitalShape,-1,1,.01,Number(state.genitalShape).toFixed(2),true)}
+    ${sliderField('genitalOffset','Proyección',state.genitalOffset,-.02,.04,.001,Math.round(state.genitalOffset*1000)+' mm',true)}
+    <div class="field full"><label class="fieldLabel" for="f-genitalSkin"><span>Tono anatómico</span></label><input id="f-genitalSkin" type="color" value="${state.genitalSkin}" data-key="genitalSkin"></div>
+    <div class="field full"><label class="fieldLabel" for="f-genitalDetailColor"><span>Tono de detalles</span></label><input id="f-genitalDetailColor" type="color" value="${state.genitalDetailColor}" data-key="genitalDetailColor"></div>
+    ${selectField('pubicHair','Vello púbico',[{value:'true',label:'Con vello'},{value:'false',label:'Sin vello'}],String(state.pubicHair),true)}
+    ${sliderField('pubicHairAmount','Densidad',state.pubicHairAmount,0,1,.01,Math.round(state.pubicHairAmount*100)+'%',true)}
+    ${sliderField('pubicHairLength','Largo del vello',state.pubicHairLength,.3,1.8,.05,state.pubicHairLength.toFixed(2)+'×',true)}
+    <div class="field full"><label class="fieldLabel" for="f-pubicHairColor"><span>Color del vello</span></label><input id="f-pubicHairColor" type="color" value="${state.pubicHairColor}" data-key="pubicHairColor"></div>
+   </div>
+   <div class="formGrid" style="margin-top:8px"><button type="button" class="choice" data-reveal-anatomy>Quitar pantalón e interior</button><button type="button" class="choice" data-view="anatomy">Acercar cámara</button></div>
+   <div class="note">La malla y su textura se generan dentro de este HTML, sin descargar otro modelo. El estado flácido/erecto, la forma, los tonos y el vello modifican la geometría generada; la ropa inferior oculta la malla hasta quitarla.</div>`;
+ }else{
+  html=`<div class="panelTitle"><strong>Anatomía</strong><small>Opciones del modelo</small></div><div class="note">Personalización anatómica integrada.</div>`;
+ }
+ panel.innerHTML=html;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function syncPanelLabels(){panel.querySelectorAll('[data-value-label]').forEach(el=>{const k=el.dataset.valueLabel;if(k==='age')el.textContent=fmtAge();else if(k==='height')el.textContent=state.height+' cm';else if(k==='weight')el.textContent=state.weight<-.3?'Delgada':state.weight>.3?'Robusta':'Media';else if(k==='muscle')el.textContent=state.muscle<-.3?'Baja':state.muscle>.3?'Alta':'Media';else if(k==='proportions')el.textContent=state.proportions<-.3?'Estilizadas':state.proportions>.3?'Marcadas':'Neutrales';else if(SHAPE_KEYS.includes(k))el.textContent=Math.round((state[k]+1)*50)+'%';else if(['breastSize','breastFirmness'].includes(k))el.textContent=Math.round(state[k]*100)+'%';else if(['breastHeight','breastSpacing','breastProjection'].includes(k))el.textContent=Math.round((state[k]+1)*50)+'%';else if(k==='genitalSize')el.textContent=Math.round(state[k]*100)+'%';else if(k==='genitalShape')el.textContent=Number(state[k]).toFixed(2);else if(k==='genitalOffset')el.textContent=Math.round(state[k]*1000)+' mm';else if(k==='pubicHairAmount')el.textContent=Math.round(state[k]*100)+'%';else if(k==='pubicHairLength')el.textContent=Number(state[k]).toFixed(2)+'×';else if(k in state)el.textContent=state[k]})}
+function ageToMorph(years){const y=Math.max(10,Math.min(60,Number(years)||25));if(y<=18)return (y-18)/8;return Math.pow(Math.max(0,(y-18)/42),1.35)}
+function heightToMorph(cm){return Math.max(-1,Math.min(1,cm<170?(cm-170)/20:(cm-170)/30))}
+function stateToValues(){
+ if(!engine)return;
+ engine.values.age=ageToMorph(state.age);engine.values.height=heightToMorph(state.height);engine.values.weight=state.weight;engine.values.muscle=state.muscle;engine.values.proportions=state.proportions;engine.values.gender=state.sex==='male'?1:-1;
+ for(const k of ['noseWidth','noseLength','noseHeight','jawWidth','chin','cheekbones','eyeSize','eyeSpacing','eyeTilt','lips','mouthWidth','earSize','forehead','breastSize','breastFirmness','breastHeight','breastSpacing','breastProjection'])engine.values[k]=state[k];
+}
+function applyModel(){
+ if(!ready||!engine)return;
+ stateToValues();
+ for(const m of parts){engine.applySliders(m,engine.values);applyShapeMorphs(m);}
+ if(joints&&body)engine.applySkeleton(body,joints,engine.values);
+ if(modelRoot)engine.applyTints(modelRoot,tints());
+ if(modelRoot)applyBrowControls(modelRoot);
+ updateFallbackEyeAppearance();updateAnatomyMeshes();
+ engine.setSkinParams({gender:engine.values.gender});
+ engine.hairUniforms.ccCollide.value=0;
+ updateHud();
+}
+function refreshPaletteActive(){panel.querySelectorAll('[data-palette]').forEach(b=>b.classList.toggle('active',b.dataset.value.toLowerCase()===state[b.dataset.palette].toLowerCase()))}
+async function handleControl(target){
+ const key=target.dataset.key;
+ if(key){
+  let val=target.value;
+  if(['age','height','genitalSize','genitalShape','genitalOffset','pubicHairAmount','pubicHairLength','browThickness','browHeight','browAngle','browSpacing'].includes(key))val=Number(val);
+  if(['pubicHair','showAnatomy'].includes(key))val=val==='true';
+  if(['weight','muscle','proportions',...SHAPE_KEYS].includes(key))val=(Number(val)/50)-1;
+  if(['breastHeight','breastSpacing','breastProjection'].includes(key))val=(Number(val)/50)-1;
+  if(['breastSize','breastFirmness'].includes(key))val=Number(val)/100;
+  if(key==='name'){state.name=val;updateHud();return}
+  if(key==='sex'){
+   state.sex=val;applyModel();
+   if(clothing){try{const ids=clothing.worn().filter(id=>{const it=clothingCatalog.items.find(i=>i.id===id);return !it?.sex||it.sex===state.sex||it.sex==='*'});await clothing.setSex(state.sex);await clothing.setOutfit(ids.filter(id=>!['briefs','panties','bra'].includes(id)));}catch(e){console.warn(e)}}
+   if(['clothes','anatomy'].includes(currentTab))renderPanel();return;
+  }
+  if(key==='hair'){
+   state.hair=val;applyModel();try{await setHair(val==='none'?null:val)}catch(e){status('ERROR AL CARGAR EL PEINADO',true);console.error(e)}return;
+  }
+  if(key==='selectedClothId'){state.selectedClothId=val;if(currentTab==='clothes')renderPanel();return}
+  if(key==='clothingColor'||key==='clothingSecondary'){const id=state.selectedClothId;if(clothing&&id&&clothing.worn().includes(id))clothing.setColor(id,key==='clothingColor'?'primary':'secondary',val);else toast('Elegí una prenda vestida antes de cambiar el color');return;}
+  state[key]=val;
+  if(['weight','muscle','proportions',...SHAPE_KEYS].includes(key)){state.bodyPreset='custom';panel.querySelectorAll('[data-body-preset]').forEach(b=>b.classList.toggle('active',b.dataset.bodyPreset===state.bodyPreset))}
+  if(ready){applyModel();}
+  if(key==='age'){updateHud();}
+  syncPanelLabels();
+  if(key==='skin'||key==='hairColor'||key==='browColor'||key==='eyeColor')refreshPaletteActive();
+ }
+ if(target.dataset.wearSlot!==undefined){
+  if(!clothing)return;
+  const slot=target.dataset.wearSlot;
+  try{
+   if(target.value){await clothing.wear(target.value);state.selectedClothId=target.value}else await clothing.takeOff(slot);
+   applyModel();if(currentTab==='clothes')renderPanel()
+  }catch(e){status('ERROR AL CARGAR LA PRENDA',true);console.error(e)}
+ }
+}
+panel.addEventListener('input',e=>{if(e.target.matches('input[data-key]'))handleControl(e.target);else if(e.target.matches('[data-palette]')){state[e.target.dataset.palette]=e.target.dataset.value;applyModel();renderPanel()}});
+panel.addEventListener('change',e=>{if(e.target.matches('input[type=range][data-key=age]')){renderPanel();return}if(e.target.matches('select[data-key],select[data-wear-slot]'))handleControl(e.target)});
+panel.addEventListener('click',e=>{const b=e.target.closest('[data-palette]');if(!b)return;state[b.dataset.palette]=b.dataset.value;applyModel();renderPanel()});
+panel.addEventListener('click',async e=>{
+ const reveal=e.target.closest('[data-reveal-anatomy]');if(reveal){if(!clothing){toast('El vestuario todavía está cargando');return}try{await clothing.takeOff('bottom');await clothing.takeOff('underwear');await clothing.takeOff('outerwear');applyModel();renderPanel();toast('Malla anatómica lista para ver');}catch(err){console.warn(err);toast('No se pudieron quitar todas las prendas inferiores')}return}
+ const grey=e.target.closest('[data-natural-grey]');if(grey){state.naturalGray=!state.naturalGray;applyModel();renderPanel();return}
+ const preset=e.target.closest('[data-body-preset]');
+ if(preset){const next=BODY_PRESETS[preset.dataset.bodyPreset];if(next){Object.assign(state,next);state.bodyPreset=preset.dataset.bodyPreset;renderPanel();applyModel();toast('Proporciones actualizadas')}return}
+ const outfit=e.target.closest('[data-outfit-preset]');
+ if(outfit){if(!clothing){toast('El vestuario 3D aún está cargando');return}try{const which=outfit.dataset.outfitPreset;const looks={adventurer:['shirt','jeans','boots'],traveler:['tshirt','jeans','shoes','trenchcoat']};await clothing.setOutfit(looks[which]||[]);state.selectedClothId=(clothing.worn().find(id=>!['briefs','panties','bra'].includes(id))||'');if(currentTab==='clothes')renderPanel();toast('Conjunto equipado')}catch(err){console.error(err);toast('No se pudo aplicar ese conjunto')}return}
+ const toggle=e.target.closest('[data-motion-toggle]');if(toggle){motionPaused=!motionPaused;if(mixer)mixer.timeScale=motionPaused?0:motionSpeed;renderPanel();return}
+ const motion=e.target.closest('[data-motion]');if(motion){motionPaused=false;playMotion(motion.dataset.motion);if(mixer)mixer.timeScale=motionSpeed;renderPanel();return}
+ const view=e.target.closest('[data-view]');if(view){setCameraView(view.dataset.view);return}
+});
+panel.addEventListener('input',e=>{if(!e.target.matches('[data-motion-speed]'))return;motionSpeed=Number(e.target.value);$('#motionSpeedValue').textContent=motionSpeed.toFixed(2)+'×';if(mixer)mixer.timeScale=motionPaused?0:motionSpeed;});
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{currentTab=b.dataset.tab;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));renderPanel();$('#panel').scrollTop=0}));
+document.querySelector('#random').addEventListener('click',async()=>{
+ const pick=a=>a[Math.floor(Math.random()*a.length)];state.name=pick(['La Errante','El Guardián','La Exploradora','El Viajero','La Forjadora']);state.sex=pick(['male','female']);state.age=10+Math.floor(Math.random()*51);state.height=150+Math.floor(Math.random()*51);state.bodyPreset='custom';state.weight=+(Math.random()*2-1).toFixed(2);state.muscle=+(Math.random()*2-1).toFixed(2);for(const k of SHAPE_KEYS)state[k]=+(Math.random()*1.2-.6).toFixed(2);state.skin=pick(skinSwatches)[1];state.hairColor=pick(hairSwatches)[1];state.eyeColor=pick(eyeSwatches)[1];state.hair=pick(['short02','short04','bob02','bob01','long01','ponytail01','braid01','afro01']);
+ for(const k of ['noseWidth','noseLength','noseHeight','jawWidth','chin','cheekbones','eyeSize','eyeSpacing','eyeTilt','lips','mouthWidth','earSize','forehead'])state[k]=+(Math.random()*1.2-.6).toFixed(2);
+ renderPanel();updateHud();applyModel();if(ready){try{await setHair(state.hair);if(clothing){await clothing.setSex(state.sex);const picks=clothingCatalog.items.filter(i=>!i.sex||i.sex===state.sex||i.sex==='*');const top=pick(picks.filter(i=>i.slot==='top'&&!['dress'].includes(i.id)));const bottom=pick(picks.filter(i=>i.slot==='bottom'));const shoes=pick(picks.filter(i=>i.slot==='shoes'));await clothing.setOutfit([top?.id,bottom?.id,shoes?.id].filter(Boolean));}}catch(e){console.warn(e)}}toast('Se generó una apariencia nueva');
+});
+document.querySelector('#reset').addEventListener('click',async()=>{Object.assign(state,startState);motionSpeed=1;motionPaused=false;renderPanel();updateHud();applyModel();if(ready){try{await setHair(state.hair);if(clothing)await clothing.setOutfit(['tshirt','jeans','shoes']);playMotion('idle_breathe')}catch(e){console.warn(e)}}toast('Apariencia reiniciada')});
+document.querySelector('#enter').addEventListener('click',()=>{
+ const payload={format:'avatar-lab-character-v9',savedAt:new Date().toISOString(),character:{...state},clothing:clothing?.worn?.()||[],hair:state.hair,ageMorph:ageToMorph(state.age),note:'Prototype save; no game world is connected yet.'};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(String(state.name||'personaje').trim().toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'')||'personaje')+'.avatar.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Personaje guardado como archivo JSON');
+});
+renderPanel();updateHud();
+
+async function init3D(){
+ try{
+  status('CARGANDO MOTOR 3D…');
+  const THREE=await import('three');
+  const {GLTFLoader}=await import('three/addons/loaders/GLTFLoader.js');
+  const {RoomEnvironment}=await import('three/addons/environments/RoomEnvironment.js');
+  const chars=await import(RAW+'character.js');
+  const mats=await import(RAW+'materials.js');
+  const eyeModule=await import(RAW+'eyelife.js');
+  eyeLife=eyeModule.createEyeLife({blink:true});applyEyeMorphWeights=eyeModule.applyMorphWeights;
+  const {createClothing}=await import(RAW+'clothing.js');
+  engine={THREE,GLTFLoader,chars,mats,createClothing,values:chars.defaultValues(),applySliders:chars.applySliders,applySkeleton:chars.applySkeleton,applyTints:chars.applyTints,characterMeshes:chars.characterMeshes,bindToSkeleton:chars.bindToSkeleton,materialRole:chars.materialRole,upgradeSkin:mats.upgradeSkin,upgradeHair:mats.upgradeHair,upgradeCornea:mats.upgradeCornea,setSkinParams:mats.setSkinParams,hairUniforms:mats.hairUniforms};
+  const canvas=$('#view');renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,matchMedia('(max-width:760px)').matches?1.5:1.85));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.NeutralToneMapping;renderer.toneMappingExposure=1.05;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  scene=new THREE.Scene();scene.background=new THREE.Color('#2b241c');
+  const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(new RoomEnvironment(),.04).texture;scene.environmentIntensity=.65;pmrem.dispose();
+  camera=new THREE.PerspectiveCamera(35,1,.035,50);camera.position.set(0,1.02,2.98);
+  controls=new (await import('three/addons/controls/OrbitControls.js')).OrbitControls(camera,canvas);controls.target.set(0,.90,0);controls.enablePan=false;controls.enableDamping=true;controls.dampingFactor=.075;controls.minDistance=.48;controls.maxDistance=4.8;controls.rotateSpeed=.75;controls.zoomSpeed=.78;
+  scene.add(new THREE.HemisphereLight(0xffe8ca,0x463323,1.25));
+  const keyLight=new THREE.DirectionalLight(0xffe0bc,2.05);keyLight.position.set(-2.5,4.5,4);keyLight.castShadow=true;keyLight.shadow.mapSize.set(1024,1024);keyLight.shadow.camera.left=-2;keyLight.shadow.camera.right=2;keyLight.shadow.camera.top=3;keyLight.shadow.camera.bottom=-1;keyLight.shadow.bias=-.0003;keyLight.shadow.normalBias=.025;keyLight.shadow.radius=4;scene.add(keyLight);
+  const fill=new THREE.DirectionalLight(0xc4d5ff,.65);fill.position.set(3,2,1);scene.add(fill);const rim=new THREE.DirectionalLight(0xe8b75e,1.15);rim.position.set(1,3,-3);scene.add(rim);
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(2.2,64),new THREE.MeshStandardMaterial({color:0x3c2c1b,roughness:.78,metalness:.12}));ground.rotation.x=-Math.PI/2;ground.position.y=-.008;ground.receiveShadow=true;scene.add(ground);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.78,.012,8,72),new THREE.MeshStandardMaterial({color:0xd3a458,metalness:.65,roughness:.38,emissive:0x4b2f0f}));ring.rotation.x=Math.PI/2;ring.position.y=.008;scene.add(ring);
+  loader=new GLTFLoader();
+  const asset=(file)=>ASSETS+String(file).replace(/^\.\//,'');
+  const [g,j,hc,cc]=await Promise.all([
+   loader.loadAsync(asset('base_body_anim.glb'),xhr=>{if(xhr?.total)status(`CARGANDO MODELO ${Math.round(xhr.loaded/xhr.total*100)}%`)}).catch(err=>{console.warn('No se pudo cargar el GLB animado; intento el modelo base sin clips.',err);return loader.loadAsync(asset('base_body.glb'),xhr=>{if(xhr?.total)status(`CARGANDO MODELO BASE ${Math.round(xhr.loaded/xhr.total*100)}%`)})}),
+   fetch(asset('base_body.joints.json')).then(r=>r.ok?r.json():null).catch(()=>null),
+   fetch(asset('hair.json')).then(r=>r.ok?r.json():null).catch(()=>null),
+   fetch(asset('clothing.json')).then(r=>r.ok?r.json():null).catch(()=>null)
+  ]);
+  modelRoot=g.scene;scene.add(modelRoot);parts=engine.characterMeshes(modelRoot);body=parts.find(m=>m.name==='Body')||parts[0];if(!body)throw new Error('El modelo no contiene un cuerpo humano con esqueleto.');joints=j?.morphs?j:null;body.frustumCulled=false;
+  const missingMorphs=engine.chars.validateMorphs(body);
+  missingAgeMorphs=['age_child','age_old'].filter(name=>body.morphTargetDictionary?.[name]===undefined);
+  if(missingMorphs.length)console.warn('[Avatar Lab] El GLB no incluye todos los morphs esperados:',missingMorphs);
+  if(missingAgeMorphs.length)console.error('[Avatar Lab] No se puede validar la edad visual: faltan morphs',missingAgeMorphs);
+  addPhysicalShapeMorphs(body);
+  motionClips=g.animations||[];if(motionClips.length){mixer=new THREE.AnimationMixer(modelRoot);mixer.addEventListener('finished',()=>{});}
+  for(const m of parts){if(m===body)continue;const bound=engine.bindToSkeleton(m,body.skeleton,body.bindMatrix);if(bound.missing.length)console.warn('Parte con huesos no compatibles:',m.name,bound.missing)}
+  await upgradeMaterials(modelRoot,g.parser);setupMaterials(modelRoot);
+  // Keep the supplied 2K skin texture and add subtle, distance-faded micro-normal detail; avoid over-sharpened plastic pores.
+  if(engine.mats?.skinUniforms?.ccPoreStrength) engine.mats.skinUniforms.ccPoreStrength.value=.43;
+  if(engine.mats?.skinUniforms?.ccPoreRepeat) engine.mats.skinUniforms.ccPoreRepeat.value=46;
+  repairEyePresentation(modelRoot,body);
+  // Loader progress is reported through the 3D status chip, not over the control panel.
+  engine.values={...engine.chars.defaultValues(),gender:state.sex==='male'?1:-1,age:ageToMorph(state.age)};
+  clothingCatalog=cc;
+  const hidden=$('#hiddenClothingUI');
+  const wrappedLoader={loadAsync:(p)=>loader.loadAsync(asset(p))};
+  clothing=createClothing({loader:wrappedLoader,lang:'en',t:k=>({clothNone:'Sin prenda',clothPrimary:'Color principal',clothSecondary:'Color de detalle',clothLoading:'CARGANDO ROPA…',clothError:'ERROR DE VESTUARIO'}[k]||k),setStatus:(m,isErr)=>{if(m)status(m,isErr);else if(ready)status('MODELO 3D · LISTO')},getBody:()=>body,addPart:m=>{if(!parts.includes(m)){parts.push(m);if(m.name?.startsWith('Cloth_')||m.userData?.ccClothing)addPhysicalShapeMorphs(m)}},getSex:()=>state.sex,underwear:true,onChange:()=>applyModel()});
+  if(clothingCatalog?.items?.length)await clothing.init(Promise.resolve(clothingCatalog),hidden,['tshirt','jeans','shoes']);
+  ready=true;stateToValues();applyModel();if(mixer&&motionClips.length)playMotion('idle_breathe');
+  if(hc?.styles?.length){hairCatalog=hc;await setHair(state.hair)}
+  status(missingAgeMorphs.length?'AVISO: MORPHS DE EDAD AUSENTES':(motionClips.length?'MODELO + ANIMACIONES · LISTO':'MODELO 3D · LISTO'));$('#modelError').style.display='none';$('#liveState').textContent=missingAgeMorphs.length?'EDAD NO VALIDADA':(motionClips.length?'ANIMADO · EN VIVO':'CAMBIOS EN VIVO');
+  if(['clothes','motion'].includes(currentTab))renderPanel();updateHud();resize();
+  frameClock=new THREE.Clock();function loop(){requestAnimationFrame(loop);const dt=Math.min(frameClock.getDelta(),.05);if(controls)controls.update();if(mixer)mixer.update(dt);
+   if(eyeLife&&applyEyeMorphWeights){const t=mixer?.time||0;const target=activeMotion==='idle_look'?{yaw:Math.sin(t*.65)*.22,pitch:Math.sin(t*.4)*.06}:{yaw:Math.sin(t*.15)*.025,pitch:0};const weights=eyeLife.update(dt,target);for(const m of parts)applyEyeMorphWeights(m,weights);updateFallbackEyeAppearance(weights)}
+   if(!motionPaused&&['idle_breathe','idle_look','idle_fidget'].includes(activeMotion)){idleElapsed+=dt;if(idleElapsed>=idleNext){const opts=['idle_breathe','idle_look','idle_fidget'].filter(x=>x!==activeMotion);playMotion(opts[Math.floor(Math.random()*opts.length)]);idleElapsed=0;idleNext=8+Math.random()*7}}
+   if(renderer&&scene&&camera)renderer.render(scene,camera)}loop();
+ }catch(e){console.error('[Avatar Lab V9]',e);status('NO SE PUDO CARGAR EL MODELO',true);$('#modelError').innerHTML=`<strong>El visor 3D no pudo cargar.</strong><br>${escapeHtml(e?.message||'Error desconocido')}<br>Este prototipo necesita internet para descargar el modelo y sus recursos.`;$('#modelError').style.display='block';$('#liveState').textContent='SIN CONEXIÓN 3D'}
+}
+async function upgradeMaterials(root,parser){
+ const jobs=[];root.traverse(o=>{if(!o.isMesh)return;const mm=[].concat(o.material);mm.forEach((m,k)=>{if(!m)return;const role=engine.materialRole(m.name);const swap=nm=>{if(Array.isArray(o.material))o.material[k]=nm;else o.material=nm};try{if(role==='skin'){const ri=m.userData?.ccRegions?.index;jobs.push((ri!==undefined?parser.getDependency('texture',ri):Promise.resolve(null)).catch(()=>null).then(tex=>swap(engine.upgradeSkin(m,tex))))}else if(role==='hair')swap(engine.upgradeHair(m,o.geometry));else if(m.name==='Cornea')engine.upgradeCornea(m)}catch(e){console.warn('material upgrade',m.name,e)}})});await Promise.all(jobs)
+}
+
+// Eye audit/repair. Some generated GLBs can load the facial skin and sockets without usable sclera/iris meshes.
+// Validate the actual scene instead of assuming that successful GLB loading means the eyes are present.
+let fallbackEyes=[];
+function repairEyePresentation(root,bodyMesh){
+ root.updateMatrixWorld(true);
+ const allEyeCandidates=[];
+ root.traverse(o=>{
+  if(!o.isMesh)return;
+  const materialNames=[].concat(o.material||[]).map(m=>m?.name||'').join(' ');
+  const label=(o.name+' '+materialNames).toLowerCase();
+  if(/eye|eyes|iris|cornea|sclera|eyeball|pupil/.test(label)) allEyeCandidates.push({o,label});
+ });
+ const headBone=bodyMesh?.skeleton?.bones?.find(b=>/^head$/i.test(b.name))||
+   bodyMesh?.skeleton?.bones?.find(b=>/head/i.test(b.name));
+ const headPos=headBone?headBone.getWorldPosition(new engine.THREE.Vector3()):new engine.THREE.Vector3(0,1.52,.04);
+ const validNearHead=({o})=>{
+  const box=new engine.THREE.Box3().setFromObject(o),size=box.getSize(new engine.THREE.Vector3()),center=box.getCenter(new engine.THREE.Vector3());
+  return size.length()>.003&&size.length()<.35&&center.distanceTo(headPos)<.32&&center.y>headPos.y-.12&&center.y<headPos.y+.25&&center.z>headPos.z-.09;
+ };
+ // Do not let a body mesh that happens to share an "Eye" material count as an eyeball or get hidden.
+ const eyeObjects=allEyeCandidates.filter(validNearHead);
+ const sclera=eyeObjects.filter(x=>/eye|eyes|sclera|eyeball/.test(x.label));
+ const iris=eyeObjects.filter(x=>/iris|pupil/.test(x.label));
+ // Labels alone are not enough: candidate geometry must physically be located in the head area.
+ if(sclera.length&&iris.length){
+  for(const {o,label} of eyeObjects){
+   o.visible=true;o.frustumCulled=false;
+   for(const m of [].concat(o.material||[])){
+    if(!m)continue;m.visible=true;
+    if(/eye|eyes|sclera|eyeball/.test((o.name+' '+m.name).toLowerCase())&&!/iris|cornea|pupil/.test((o.name+' '+m.name).toLowerCase())){
+     m.opacity=1;m.transparent=false;m.color?.set('#eee8de');m.roughness=Math.max(.18,Math.min(.32,m.roughness??.25));
+    }
+    if(/iris/i.test(m.name)&&m.color)m.color.set(state.eyeColor);
+    m.needsUpdate=true;
+   }
+  }
+  return;
+ }
+ // Hide only small, eye-like meshes in the face area; never hide the body mesh.
+ for(const {o} of eyeObjects)o.visible=false;
+ const T=engine.THREE, head=headBone;
+ const parent=head||root;
+ const eyeRoot=new T.Group();eyeRoot.name='AvatarLab_EyeFallback';
+ if(head){head.add(eyeRoot);eyeRoot.position.set(0,0,0);}
+ else {root.add(eyeRoot);eyeRoot.position.set(0,1.57,.08);}
+ const makeMat=(color,roughness=.35,metalness=0)=>new T.MeshStandardMaterial({color,roughness,metalness});
+ const whiteMat=makeMat('#eee8de',.24), rimMat=makeMat('#34251c',.55), pupilMat=makeMat('#101013',.18);
+ const glossMat=new T.MeshBasicMaterial({color:'#ffffff'});
+ const ballGeo=new T.SphereGeometry(1,32,24);
+ for(const side of [-1,1]){
+  const group=new T.Group();group.name=side<0?'EyeFallback_L':'EyeFallback_R';eyeRoot.add(group);
+  const sclera=new T.Mesh(ballGeo,whiteMat);sclera.name='FallbackSclera';sclera.scale.set(.024,.019,.015);sclera.castShadow=false;group.add(sclera);
+  const irisRim=new T.Mesh(new T.SphereGeometry(1,24,18),rimMat);irisRim.scale.set(.0104,.0104,.0028);irisRim.position.set(0,0,.0135);irisRim.castShadow=false;group.add(irisRim);
+  const iris=new T.Mesh(new T.SphereGeometry(1,32,24),makeMat(state.eyeColor,.32));iris.scale.set(.0088,.0088,.0032);iris.position.set(0,0,.0147);iris.castShadow=false;group.add(iris);
+  // Iris fibres live in eye-group space (not iris-scaled space) so they remain visible on close-ups.
+  const fiberMat=new T.LineBasicMaterial({color:new T.Color(state.eyeColor).lerp(new T.Color('#d5b17a'),.32)});
+  const fiberGeo=new T.BufferGeometry(),fiberPos=[];
+  for(let i=0;i<24;i++){const a=i/24*Math.PI*2,r1=.0042,r2=.0071;fiberPos.push(Math.cos(a)*r1,Math.sin(a)*r1,.0175,Math.cos(a)*r2,Math.sin(a)*r2,.0175)}
+  fiberGeo.setAttribute('position',new T.Float32BufferAttribute(fiberPos,3));
+  const fibers=new T.LineSegments(fiberGeo,fiberMat);fibers.name='FallbackIrisFibres';group.add(fibers);
+  const pupil=new T.Mesh(new T.SphereGeometry(1,24,18),pupilMat);pupil.scale.set(.0041,.005,.0016);pupil.position.set(0,0,.0173);pupil.castShadow=false;group.add(pupil);
+  const glint=new T.Mesh(new T.SphereGeometry(1,12,10),glossMat);glint.scale.set(.0021,.0021,.001);glint.position.set(-.0027,.003,.019);glint.castShadow=false;group.add(glint);
+  const lid=new T.Mesh(new T.SphereGeometry(1,24,16),makeMat(state.skin,.76));lid.scale.set(.023,.004,.003);lid.position.set(0,.016,.004);lid.castShadow=false;group.add(lid);
+  fallbackEyes.push({side,group,sclera,iris,irisRim,pupil,glint,lid,fiberMat});
+ }
+ eyeRoot.userData.fallback=true;
+ updateFallbackEyeAppearance();
+}
+function updateFallbackEyeAppearance(weights=null){
+ if(!fallbackEyes.length||!engine?.THREE)return;
+ const T=engine.THREE, color=new T.Color(state.eyeColor), skin=new T.Color(state.skin);
+ const w=weights||{};
+ for(const e of fallbackEyes){
+  const spacing=.034*(1+Math.max(-.75,Math.min(.75,state.eyeSpacing))*.23);
+  const ageEye=1+Math.max(0,(18-state.age)/8)*.09-Math.max(0,(state.age-48)/12)*.025;
+  const size=(1+Math.max(-.8,Math.min(.8,state.eyeSize))*.18)*ageEye;
+  e.group.position.set(e.side*spacing,.054+state.forehead*.003,.063);
+  e.sclera.scale.set(.024*size,.019*size,.015*size);
+  e.iris.material.color.copy(color);e.irisRim.material.color.copy(color).multiplyScalar(.57);
+  e.fiberMat.color.copy(color).lerp(new T.Color('#dfc18c'),.28);
+  e.lid.material.color.copy(skin);
+  const x=((w.look_left||0)-(w.look_right||0))*.0048;
+  const y=((w.look_up||0)-(w.look_down||0))*.0038;
+  e.iris.position.set(x,y,.0147);e.irisRim.position.set(x,y,.0135);
+  e.pupil.position.set(x,y,.0173);e.glint.position.set(x-.0027,y+.003,.019);
+  const blink=Math.max(w.blink_left||0,w.blink_right||0);
+  e.lid.scale.set(.023,.004+blink*.014,.003);e.lid.position.set(0,.016-blink*.012,.0048);
+  e.lid.visible=blink>.12;
+ }
+}
+
+function setupMaterials(root){root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;for(const m of [].concat(o.material||[])){if(!m)continue;const role=engine.materialRole(m.name);if(role==='hair'||role==='brows'||role==='lashes'){m.alphaToCoverage=true;m.transparent=false;m.depthWrite=true;m.side=engine.THREE.DoubleSide;if(role!=='hair')o.castShadow=false}if(m.name==='Cornea'){m.envMapIntensity=.7;o.castShadow=false;o.receiveShadow=false;o.renderOrder=2}if(m.name==='Eye'||m.name==='Iris')o.castShadow=false;m.needsUpdate=true}})}
+async function setHair(id){
+ if(!ready||!hairCatalog)return;currentHair=id||null;
+ for(const [k,ms]of hairCache)for(const m of ms)m.visible=k===currentHair;
+ if(!currentHair){state.hair='none';applyModel();return}
+ if(!hairCache.has(currentHair)){
+  const style=hairCatalog.styles.find(s=>s.id===currentHair);if(!style)throw new Error('Peinado no encontrado: '+currentHair);
+  status('CARGANDO CABELLO…');const g=await loader.loadAsync(ASSETS+style.file);const ms=engine.characterMeshes(g.scene);if(!ms.length)throw new Error('El peinado no contiene malla con esqueleto');
+  const holder=body.parent;for(const m of ms){m.removeFromParent();m.position.copy(body.position);m.quaternion.copy(body.quaternion);m.scale.copy(body.scale);holder.add(m);const res=engine.bindToSkeleton(m,body.skeleton,body.bindMatrix);if(res.missing.length)throw new Error('El peinado no coincide con el esqueleto del cuerpo');m.frustumCulled=false;parts.push(m)}
+  await upgradeMaterials({traverse:fn=>ms.forEach(m=>m.traverse(fn))},g.parser);setupMaterials({traverse:fn=>ms.forEach(m=>m.traverse(fn))});hairCache.set(currentHair,ms)
+ }
+ for(const [k,ms]of hairCache)for(const m of ms)m.visible=k===currentHair;state.hair=currentHair;applyModel();status('MODELO 3D · LISTO');
+}
+function resize(){if(!renderer||!camera)return;const stage=$('#stage');const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+window.addEventListener('resize',resize);if(window.visualViewport)window.visualViewport.addEventListener('resize',resize);
+init3D();
+</script>
+</body>
+</html>

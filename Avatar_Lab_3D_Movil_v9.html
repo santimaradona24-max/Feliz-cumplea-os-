@@ -392,11 +392,15 @@ function applyBrowControls(root){
  if(!root||!engine)return;
  root.traverse(o=>{
   if(!o.isMesh||!o.geometry?.attributes?.position)return;
-  const mats=[].concat(o.material||[]),hasBrowMaterial=mats.some(m=>m&&engine.materialRole(m.name)==='brows');
-  if(!/brow|eyebrow|ceja/i.test(o.name||'')&&!hasBrowMaterial)return;
+  const mats=[].concat(o.material||[]),hasBrowMaterial=mats.some(m=>m&&engine.materialRole(m.name)==='brows'),namedBrow=/brow|eyebrow|ceja/i.test(o.name||'');
+  if(!namedBrow&&!hasBrowMaterial)return;
   const geo=o.geometry,attr=geo.attributes.position;
+  geo.computeBoundingBox();
+  // A material array can include brows on a much larger face/body mesh. Do not
+  // deform that entire mesh; a material-only match must have brow-sized bounds.
+  if(!namedBrow&&hasBrowMaterial){const b=geo.boundingBox;if((b.max.x-b.min.x)>.42||(b.max.y-b.min.y)>.14||(b.max.z-b.min.z)>.30)return;}
   if(!browBaseData.has(o)){
-   geo.computeBoundingBox();const bb=geo.boundingBox;
+   const bb=geo.boundingBox;
    browBaseData.set(o,{positions:attr.array.slice(),center:[(bb.min.x+bb.max.x)/2,(bb.min.y+bb.max.y)/2,(bb.min.z+bb.max.z)/2],height:bb.max.y-bb.min.y,scale:o.scale.clone(),position:o.position.clone(),rotation:o.rotation.clone()});
   }
   const base=browBaseData.get(o),arr=base.positions,thick=Math.max(.55,Math.min(1.45,1+Number(state.browThickness||0)*.45)),height=Number(state.browHeight||0)*.014,spacing=Number(state.browSpacing||0)*.010,angle=Number(state.browAngle||0)*.18;

@@ -315,7 +315,6 @@ function makeMaleProxyGeometry(info){
  geo.setAttribute('normal',new T.BufferAttribute(new Float32Array(p.length),3));
  const skinIndex=new Uint16Array(pairs.length*4),skinWeight=new Float32Array(pairs.length*4);
  const bsi=body.geometry.attributes.skinIndex?.array,bsw=body.geometry.attributes.skinWeight?.array;
- const bodyN=body.geometry.attributes.position.count;
  const pelvisIndex=Math.max(0,body.skeleton.bones.findIndex(b=>/^(hips|pelvis)$/i.test(b.name)));
  const mappedInfluence=(row)=>{
   if(row.kind==='direct'&&row.index>=0&&row.index<bodyN&&bsi&&bsw)return Array.from({length:4},(_,k)=>[bsi[row.index*4+k],bsw[row.index*4+k]]);

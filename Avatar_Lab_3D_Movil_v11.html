@@ -404,31 +404,7 @@ function maleProxyBodyPositions(info){
  info.sourceFallbacks=sourceFallbacks;info.affineRms=affine.rms;info.affineMatched=affine.matched;
  return fit;
 }
-function applyFlaccidProxyShape(fit,info){
- // Only barycentrically inserted anatomical vertices are bent/shortened. The original
- // body vertices remain sourced from the matching base topology.
- const raw=info.obj.positions,rows=info.rows;
- let rootY=0,rootZ=0,rootN=0;
- for(let i=0;i<rows.length;i++){
-  if(rows[i].kind!=='triangle')continue;
-  const p=raw[i];
-  if(p[1]>=.805&&p[1]<=.86&&p[2]>=.065&&p[2]<=.14){rootY+=fit[i*3+1];rootZ+=fit[i*3+2];rootN++;}
- }
- rootY=rootN?rootY/rootN:.84;rootZ=rootN?rootZ/rootN:.095;
- const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t)};
- const angle=-.58,cs=Math.cos(angle),sn=Math.sin(angle),lengthScale=.72;
- for(let i=0;i<rows.length;i++){
-  if(rows[i].kind!=='triangle')continue;
-  const p=raw[i],w=smooth(.12,.23,p[2])*smooth(.805,.86,p[1]);
-  if(w<=0)continue;
-  const o=i*3,dy=fit[o+1]-rootY,dz=fit[o+2]-rootZ;
-  const targetY=rootY+lengthScale*(dy*cs+dz*sn);
-  const targetZ=rootZ+lengthScale*(dz*cs-dy*sn);
-  fit[o+1]+=(targetY-fit[o+1])*w;
-  fit[o+2]+=(targetZ-fit[o+2])*w;
- }
- return fit;
-}
+
 function updateMaleProxyGeometry(mesh,force=false){
  if(!mesh||!body||!engine)return;
  const info=mesh.userData.maleProxyInfo;
@@ -436,7 +412,7 @@ function updateMaleProxyGeometry(mesh,force=false){
  if(info.invalidFitSig===fitSig){mesh.visible=false;return;}
  if(!force&&info.fitSig===fitSig)return;
  const fit=maleProxyBodyPositions(info);
- if(mesh.userData.maleProxyState==='flaccid')applyFlaccidProxyShape(fit,info);
+ // Preserve the source model's original anatomy: no hand-authored bend/scale is applied.
  const geo=info.geometry,pos=geo.attributes.position.array,normals=new Float32Array(info.rows.length*3),pairs=info.pairs;
  // Guard the pelvic overlay before writing any geometry. The original body remains visible;
  // a bad correspondence must hide only this added patch, never distort the character.
@@ -479,9 +455,13 @@ async function loadMaleProxy(stateName){
  const rows=parseMaleProxyMap(mapText),obj=parseMaleProxyObj(objText);
  if(rows.length!==obj.positions.length)throw new Error('No coinciden vértices OBJ/proxy: '+obj.positions.length+'/'+rows.length);
  const bodyN=body.geometry.attributes.position.count;
- const badRow=rows.findIndex(r=>r.kind==='direct'?(r.index<0||r.index>=bodyN):r.ids.some(i=>i<0||i>=bodyN));
- const directRefs=rows.filter(r=>r.kind==='direct').map(r=>r.index),uniqueDirectRefs=new Set(directRefs);
- if(badRow>=0||directRefs.length!==bodyN||uniqueDirectRefs.size!==bodyN)throw new Error('Malla incompatible con la topología del cuerpo actual; se cancela para evitar deformar el personaje.');
+ // The flaccid MakeHuman proxy intentionally replaces a small patch of the original
+ // body topology; it therefore does NOT map every body vertex one-to-one. Only require
+ // enough valid direct correspondences to fit it safely. Triangle rows with helper
+ // indices outside this compact GLB are handled by the 3D affine fallback below.
+ const validDirect=rows.filter(r=>r.kind==='direct'&&Number.isInteger(r.index)&&r.index>=0&&r.index<bodyN).map(r=>r.index);
+ const uniqueValidDirect=new Set(validDirect);
+ if(validDirect.length<bodyN*.90||uniqueValidDirect.size<bodyN*.90)throw new Error('No hay suficientes correspondencias válidas con el cuerpo base; se oculta esta malla para proteger el personaje.');
  const info={rows,obj,refs:parseMaleProxyScale(mapText),fitSig:''};
  const geometry=makeMaleProxyGeometry(info);
  const skinMat=[].concat(body.material||[]).find(m=>m&&engine.materialRole(m.name)==='skin')||[].concat(body.material||[])[0];

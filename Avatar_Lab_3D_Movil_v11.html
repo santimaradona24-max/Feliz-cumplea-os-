@@ -234,13 +234,13 @@ function applyShapeMorphs(mesh){if(!mesh?.morphTargetDictionary||!mesh.morphTarg
 
 /*
  * Male-only body proxy sources. Both assets follow MakeHuman's HM08 body topology.
- * Flaccid: adult_male_genitalia proxy, AGPL-3.0; original source/model is fetched from its repository.
- * Erect: Male_Gen-Heal1 proxy, CC0.
+ * Both states use Male_Gen-Heal1 (CC0), whose mapping matches this lab's 13,380-vertex body.
+ * Flaccid state bends only the added anatomical vertices; it never uses a mismatched body topology.
  * Asset source: https://github.com/rossmrobinson/proto-game/tree/9088314b5fe5f788c25a2aa3b42f99dee00e62f5/single-room/assets/mh-assets/proxies
  */
 const MALE_PROXY_ROOT='https://cdn.jsdelivr.net/gh/rossmrobinson/proto-game@9088314b5fe5f788c25a2aa3b42f99dee00e62f5/single-room/assets/mh-assets/proxies/';
 const MALE_PROXY_ASSETS={
- flaccid:{obj:MALE_PROXY_ROOT+'adult-male-genitalia/adult_male_genitalia.obj',map:MALE_PROXY_ROOT+'adult-male-genitalia/adult_male_genitalia.proxy'},
+ flaccid:{obj:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.obj',map:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.proxy'},
  erect:{obj:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.obj',map:MALE_PROXY_ROOT+'erect-penis/Male_Gen-Heal1.proxy'}
 };
 function parseMaleProxyMap(source){
@@ -404,12 +404,39 @@ function maleProxyBodyPositions(info){
  info.sourceFallbacks=sourceFallbacks;info.affineRms=affine.rms;info.affineMatched=affine.matched;
  return fit;
 }
+function applyFlaccidProxyShape(fit,info){
+ // The proxy includes the original body surface plus inserted anatomical vertices.
+ // Only inserted vertices (barycentric rows) are bent/shortened; original body vertices
+ // remain aligned with the loaded body, preventing whole-body distortion.
+ const raw=info.obj.positions,rows=info.rows;
+ let rootY=0,rootZ=0,rootN=0;
+ for(let i=0;i<rows.length;i++){
+  if(rows[i].kind!=='triangle')continue;
+  const p=raw[i];
+  if(p[1]>=.805&&p[1]<=.86&&p[2]>=.065&&p[2]<=.14){rootY+=fit[i*3+1];rootZ+=fit[i*3+2];rootN++;}
+ }
+ rootY=rootN?rootY/rootN:.84;rootZ=rootN?rootZ/rootN:.095;
+ const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t)};
+ const angle=-.58,cs=Math.cos(angle),sn=Math.sin(angle),lengthScale=.72;
+ for(let i=0;i<rows.length;i++){
+  if(rows[i].kind!=='triangle')continue;
+  const p=raw[i],w=smooth(.12,.23,p[2])*smooth(.805,.86,p[1]);
+  if(w<=0)continue;
+  const o=i*3,dy=fit[o+1]-rootY,dz=fit[o+2]-rootZ;
+  const targetY=rootY+lengthScale*(dy*cs+dz*sn);
+  const targetZ=rootZ+lengthScale*(dz*cs-dy*sn);
+  fit[o+1]+=(targetY-fit[o+1])*w;
+  fit[o+2]+=(targetZ-fit[o+2])*w;
+ }
+ return fit;
+}
 function updateMaleProxyGeometry(mesh,force=false){
  if(!mesh||!body||!engine)return;
  const info=mesh.userData.maleProxyInfo;
  const fitSig=JSON.stringify([Object.values(engine.values||{}),SHAPE_KEYS.map(k=>state[k])]);
  if(!force&&info.fitSig===fitSig)return;
  const fit=maleProxyBodyPositions(info);
+ if(mesh.userData.maleProxyState==='flaccid')applyFlaccidProxyShape(fit,info);
  const geo=info.geometry,pos=geo.attributes.position.array,normals=new Float32Array(info.rows.length*3),pairs=info.pairs;
  for(let i=0;i<pairs.length;i++){
   const src=pairs[i].mapIndex,o=i*3,p=src*3;
@@ -436,6 +463,9 @@ async function loadMaleProxy(stateName){
  const [objText,mapText]=await Promise.all([objRes.text(),mapRes.text()]);
  const rows=parseMaleProxyMap(mapText),obj=parseMaleProxyObj(objText);
  if(rows.length!==obj.positions.length)throw new Error('No coinciden vértices OBJ/proxy: '+obj.positions.length+'/'+rows.length);
+ const bodyN=body.geometry.attributes.position.count;
+ const badRow=rows.findIndex(r=>r.kind==='direct'?(r.index<0||r.index>=bodyN):r.ids.some(i=>i<0||i>=bodyN));
+ if(badRow>=0)throw new Error('Malla incompatible con el cuerpo actual (referencia fuera de rango en vértice '+badRow+'); se cancela para evitar deformar el personaje.');
  const info={rows,obj,refs:parseMaleProxyScale(mapText),fitSig:''};
  const geometry=makeMaleProxyGeometry(info);
  const skinMat=[].concat(body.material||[]).find(m=>m&&engine.materialRole(m.name)==='skin')||[].concat(body.material||[])[0];
@@ -446,6 +476,7 @@ async function loadMaleProxy(stateName){
  mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.renderOrder=0;
  (body.parent||modelRoot).add(mesh);mesh.bind(body.skeleton,body.bindMatrix);
  mesh.userData.maleProxyInfo=info;
+ mesh.userData.maleProxyState=stateName;
  updateMaleProxyGeometry(mesh,true);
  return mesh;
 }
